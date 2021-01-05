@@ -127,7 +127,7 @@ public class OnRemoveSystem : OnRemove<SomeComponent>
 1. entities.Each((..........)=>{....});
 
 ```
-//execute logic from each entity that has the components specified in it
+//execute logic for each entity that has the components specified in it
 
 public class UpdateSystemSingleThreadExample : UpdateSystem 
 {
