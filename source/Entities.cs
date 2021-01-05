@@ -11,7 +11,7 @@ namespace Wargon.ezs
         internal TypeMap<Type, Entities> Withouts;
         internal TypeMap<Type, EntityType> EntityTypes;
         protected int[] excludedTypes;
-        private int archetypesCount;
+        private int entityTypesCount;
         protected Type Type;
         public delegate void Lambda<A>(ref A a);
         public delegate void Lambda<A, B>(ref A a, ref B b);
@@ -25,7 +25,7 @@ namespace Wargon.ezs
             EntityTypes = new TypeMap<Type, EntityType>(world.EntityTypesCachSize);
             Withouts = new TypeMap<Type, Entities>(world.EntityTypesCachSize);
             Type = GetType();
-            archetypesCount = 0;
+            entityTypesCount = 0;
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public Entities WithOut<NA>()
@@ -357,7 +357,7 @@ namespace Wargon.ezs
             if (!EntityTypes.HasKey(type))
             {
                 EntityTypes.Add(type, archetype);
-                archetypesCount++;
+                entityTypesCount++;
             }
         }
 
@@ -368,7 +368,7 @@ namespace Wargon.ezs
             if (!EntityTypes.HasKey(type))
             {
                 EntityTypes.Add(type, archetype);
-                archetypesCount++;
+                entityTypesCount++;
             }
 
         }
@@ -379,7 +379,7 @@ namespace Wargon.ezs
             if (!EntityTypes.HasKey(type))
             {
                 EntityTypes.Add(type, archetype);
-                archetypesCount++;
+                entityTypesCount++;
             }
         }
         internal void InjectEntityType(Type typeA, Type typeB, Type typeC, Type typeD)
@@ -390,7 +390,7 @@ namespace Wargon.ezs
             if (!EntityTypes.HasKey(type))
             {
                 EntityTypes.Add(type, archetype);
-                archetypesCount++;
+                entityTypesCount++;
             }
         }
         internal void InjectEntityType(Type typeA, Type typeB, Type typeC, Type typeD, Type typeE)
@@ -401,7 +401,7 @@ namespace Wargon.ezs
             if (!EntityTypes.HasKey(type))
             {
                 EntityTypes.Add(type, archetype);
-                archetypesCount++;
+                entityTypesCount++;
             }
         }
         internal void InjectArchetypeWithout1(Type typeA, Type na)
@@ -412,7 +412,7 @@ namespace Wargon.ezs
             if (!EntityTypes.HasKey(type))
             {
                 EntityTypes.Add(type, archetype);
-                archetypesCount++;
+                entityTypesCount++;
             }
         }
 
@@ -424,7 +424,7 @@ namespace Wargon.ezs
             if (!EntityTypes.HasKey(type))
             {
                 EntityTypes.Add(type, archetype);
-                archetypesCount++;
+                entityTypesCount++;
             }
 
         }
@@ -436,7 +436,7 @@ namespace Wargon.ezs
             if (!EntityTypes.HasKey(type))
             {
                 EntityTypes.Add(type, archetype);
-                archetypesCount++;
+                entityTypesCount++;
             }
         }
         internal void InjectArchetypeWithout1(Type typeA, Type typeB, Type typeC, Type typeD, Type na)
@@ -447,7 +447,7 @@ namespace Wargon.ezs
             if (!EntityTypes.HasKey(type))
             {
                 EntityTypes.Add(type, archetype);
-                archetypesCount++;
+                entityTypesCount++;
             }
         }
         internal void InjectArchetypeWithout1(Type typeA, Type typeB, Type typeC, Type typeD, Type typeE, Type na)
@@ -458,7 +458,7 @@ namespace Wargon.ezs
             if (!EntityTypes.HasKey(type))
             {
                 EntityTypes.Add(type, archetype);
-                archetypesCount++;
+                entityTypesCount++;
             }
         }
         internal void InjectArchetypeWithout2(Type typeA, Type na, Type nb)
@@ -469,7 +469,7 @@ namespace Wargon.ezs
             if (!EntityTypes.HasKey(type))
             {
                 EntityTypes.Add(type, archetype);
-                archetypesCount++;
+                entityTypesCount++;
             }
         }
 
@@ -481,7 +481,7 @@ namespace Wargon.ezs
             if (!EntityTypes.HasKey(type))
             {
                 EntityTypes.Add(type, archetype);
-                archetypesCount++;
+                entityTypesCount++;
             }
 
         }
@@ -493,7 +493,7 @@ namespace Wargon.ezs
             if (!EntityTypes.HasKey(type))
             {
                 EntityTypes.Add(type, archetype);
-                archetypesCount++;
+                entityTypesCount++;
             }
         }
         internal void InjectArchetypeWithout2(Type typeA, Type typeB, Type typeC, Type typeD, Type na, Type nb)
@@ -504,7 +504,7 @@ namespace Wargon.ezs
             if (!EntityTypes.HasKey(type))
             {
                 EntityTypes.Add(type, archetype);
-                archetypesCount++;
+                entityTypesCount++;
             }
         }
         internal void InjectArchetypeWithout2(Type typeA, Type typeB, Type typeC, Type typeD, Type typeE, Type na, Type nb)
@@ -515,7 +515,7 @@ namespace Wargon.ezs
             if (!EntityTypes.HasKey(type))
             {
                 EntityTypes.Add(type, archetype);
-                archetypesCount++;
+                entityTypesCount++;
             }
         }
         internal EntityType NewArchetype(Type a)
@@ -594,20 +594,6 @@ namespace Wargon.ezs
         {
             var archetype = typeof(EntityType<,,,,>.WithOut<,>).MakeGenericType(a, b, c, d, e, na, nb);
             return (EntityType)Activator.CreateInstance(archetype, new object[] { world });
-        }
-    }
-    public partial class Entities
-    {
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public virtual void Each<ATag, B, C, D, E>(Lambda<B, C, D, E> action)
-        {
-            var arch = GetEntityType<ATag, B, C, D, E>();
-            var count = arch.Count;
-            for (var i = 0; i < count; i++)
-                action(ref arch.GetByIndexB(i),
-                        ref arch.GetByIndexC(i),
-                        ref arch.GetByIndexD(i),
-                        ref arch.GetByIndexE(i));
         }
     }
 }
