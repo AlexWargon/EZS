@@ -92,7 +92,7 @@ public class OnRemoveSystem : OnRemove<SomeComponent> {
     }
 }
 ```
-№ System Loops: SingleThread and MultyThread:
+# System Loops: SingleThread and MultyThread:
 1. entities.Each(()=>{});
 
 ```
