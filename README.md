@@ -155,7 +155,7 @@ public class UpdateSystemMultyThreadExample  : UpdateSystem
 }
 
 ```
-3. You can filter entites not only by including components, but also by exluding
+3. You can filter entities not only by including components, but also by exluding
 ```C#
 public class WuthoutSystemExample  : UpdateSystem 
 {
