@@ -156,4 +156,18 @@ public class UpdateSystemMultyThreadExample  : UpdateSystem
         });
     }
 }
+
+```
+3. You can filter entites not only by including components, but also by exluding
+```
+public class WuthoutSystemExample  : UpdateSystem 
+{
+    public override void Update() 
+    {
+        entities.Without<UnActive, PlayerTag>().EachThreaded((ref Rigidbody rb, ref RayCast ray, ref Impact impact, ref CanReflect reflect, ref BossTag tag) => 
+        {
+            //some logic
+        });
+    }
+}
 ```
