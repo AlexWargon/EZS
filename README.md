@@ -1,5 +1,5 @@
 # EZS
-C# Entity Component System (ECS) based on struct components
+C# Entity Component System (ECS) based on structs components
 
 Inspired by LeoECS https://github.com/Leopotam/ecs and UnityECS
 
