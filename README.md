@@ -168,6 +168,10 @@ public class WuthoutSystemExample  : UpdateSystem
         {
             //some logic
         });
+        entities.Without<UnActive, PlayerTag>().Each((ref Rigidbody rb, ref BoxCollider box, ref) => 
+        {
+            //some logic
+        });
     }
 }
 ```
