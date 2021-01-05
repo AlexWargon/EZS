@@ -31,10 +31,10 @@ private void GameUpdateLoop(){
     systems.OnUpdate();
 }
 private void GameFixedUpdateLoop(){
-    systems.OnUpdate();
+    systemsFixed.OnUpdate();
 }
 private void GameLateUpdateLoop(){
-    systems.OnUpdate();
+    systemsLate.OnUpdate();
 }
 ```
 
