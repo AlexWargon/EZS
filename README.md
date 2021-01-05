@@ -121,7 +121,7 @@ public class OnRemoveSystem : OnRemove<SomeComponent>
     }
 }
 ```
-# System Loops: SingleThread and MultyThread:
+# System Loops: Each and EachThreaded:
 1. entities.Each((..........)=>{....});
 ```C#
 //execute logic for each entity that has the components specified in it
