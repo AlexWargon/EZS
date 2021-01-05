@@ -30,7 +30,6 @@ var entity = world.CreateEntity()
 entity.Add(new Health{ value = 100 });
 
 // check is entity has type of component
-// it's return bool so you can use it at if statement or other logic on bool
 entity.Has<Health>()
 
 // get component
@@ -38,9 +37,15 @@ entity.Get<Health>()
 
 //remove component
 entity.Remove<Health>()
+
+//check is entity alive or destroyed
+entity.IsDead();
+
+//destroy entity
+entity.Destroy();
 ```
 # Components:
-Use component only with some cind of public data.
+Components are just structs with public fields
 Examples:
 ```
 public struct Health { 
@@ -53,10 +58,12 @@ public struct TransformRef{
 # You can use two cinds of systems : 
 
 # 1. Update systems
+
 ```
+//Type of systems that will execute every time when you call systems.OnUpdate();
 public class UpdateExampleSystem : UpdateSystem {
     public override void Update() {
-        Entities.Each((ref Entity entity, ref Heal heal, ref Health health) => {
+        entities.Each((ref Entity entity, ref Heal heal, ref Health health) => {
             health.value += heal.value;
             heal.value--;
             if(heal.value <= 0)
@@ -70,7 +77,7 @@ a) Call system when component added to some entity
 ```
 public class DamageSystem : OnAdd<Damaged> {
     public override void Execute() {
-        Entities.Each((ref Health heath, ref Damaged damage) => {
+        entities.Each((ref Health heath, ref Damaged damage) => {
             heath.value -= damage.value;
         });
     }
@@ -82,6 +89,31 @@ b) Call system when component removed from some entity
 public class OnRemoveSystem : OnRemove<SomeComponent> {
     public override void Execute() {
         //some logic
+    }
+}
+```
+№ System Loops: SingleThread and MultyThread:
+1. entities.Each(()=>{});
+
+```
+//execute logic from each entity that has the components specified in it
+public class UpdateSystemSingleThreadExample : UpdateSystem {
+    public override void Update() {
+        entities.Each((ref Rigidbody rb, ref BoxCollider box, ref) => {
+            //some logic
+        });
+    }
+}
+```
+2. entities.EachThreaded(()=>{});
+```
+//same think like entities.Each(()=>), but use all threads of CPU!!!
+//p.s. it won't work with unity object types like Transform, GameObject, Rigidbody and others :C
+public class UpdateSystemMultyThreadExample  : UpdateSystem {
+    public override void Update() {
+        entities.EachThreaded((ref Rigidbody rb, ref RayCast ray, ref Impact impact, ref CanReflect reflect, ref BossTag tag) => {
+            //some logic
+        });
     }
 }
 ```
