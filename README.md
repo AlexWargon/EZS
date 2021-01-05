@@ -10,7 +10,7 @@ Just copy source folder in assets folder of your game
 # How it works:
 
 Init World and Systems
-```
+```C#
 var world = new World();
 var systems = new Systems(world);
 systems .Add(new PlayerMoveSystem())  //Add update system
@@ -27,7 +27,7 @@ systemsLate.Init();
 
 ```
 Call update of systems in your update loop
-```
+```C#
 private void GameUpdateLoop()
 {
     systems.OnUpdate();
@@ -44,7 +44,7 @@ private void GameLateUpdateLoop()
 
 
 Work with entities
-```
+```C#
 //create new entity
 var entity = world.CreateEntity()
 
@@ -69,7 +69,7 @@ entity.Destroy();
 # Components:
 Components are just structs with public fields
 Examples:
-```
+```C#
 public struct Health 
 { 
     public int value;
@@ -83,7 +83,7 @@ public struct TransformRef
 
 # 1. Update systems
 
-```
+```C#
 //Type of systems that will execute every time when you call systems.OnUpdate();
 public class UpdateExampleSystem : UpdateSystem 
 {
@@ -98,7 +98,7 @@ public class UpdateExampleSystem : UpdateSystem
 ```
 # 2. Reactive systems
 a) Call system when component added to some entity   
-```
+```C#
 public class DamageSystem : OnAdd<Damaged> 
 {
     public override void Execute() 
@@ -112,7 +112,7 @@ public class DamageSystem : OnAdd<Damaged>
 ```
 
 b) Call system when component removed from some entity
-```
+```C#
 public class OnRemoveSystem : OnRemove<SomeComponent> 
 {
     public override void Execute() 
@@ -123,8 +123,7 @@ public class OnRemoveSystem : OnRemove<SomeComponent>
 ```
 # System Loops: SingleThread and MultyThread:
 1. entities.Each((..........)=>{....});
-
-```
+```C#
 //execute logic for each entity that has the components specified in it
 
 public class UpdateSystemSingleThreadExample : UpdateSystem 
@@ -140,7 +139,7 @@ public class UpdateSystemSingleThreadExample : UpdateSystem
 
 ```
 2. entities.EachThreaded((..........)=>{.....});
-```
+```C#
 //same think like entities.Each(()=>), but use all threads of CPU!!!
 //p.s. it won't work with unity object types like Transform, GameObject, Rigidbody and others :C
 
@@ -157,7 +156,7 @@ public class UpdateSystemMultyThreadExample  : UpdateSystem
 
 ```
 3. You can filter entites not only by including components, but also by exluding
-```
+```C#
 public class WuthoutSystemExample  : UpdateSystem 
 {
     public override void Update() 
