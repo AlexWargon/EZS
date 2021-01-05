@@ -1,6 +1,6 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 # EZS
-C# Entity Component System (ECS) based on structs components
+C# Entity Component System (ECS) based on struct components
 
 Inspired by LeoECS https://github.com/Leopotam/ecs and UnityECS
 
@@ -51,10 +51,10 @@ var entity = world.CreateEntity()
 //add component
 entity.Add(new Health{ value = 100 });
 
-// check is entity has type of component
+//check is entity has type of component
 entity.Has<Health>()
 
-// get component
+//get component
 entity.Get<Health>()
 
 //remove component
@@ -134,7 +134,7 @@ public class UpdateSystemSingleThreadExample : UpdateSystem
 {
     public override void Update() 
     {
-        entities.Each((ref Rigidbody rb, ref BoxCollider box, ref) => 
+        entities.Each((ref Rigidbody rb, ref BoxCollider box) => 
         {
             //some logic
         });
@@ -169,7 +169,7 @@ public class WuthoutSystemExample  : UpdateSystem
         {
             //some logic
         });
-        entities.Without<UnActive, PlayerTag>().Each((ref Rigidbody rb, ref BoxCollider box, ref) => 
+        entities.Without<UnActive, PlayerTag>().Each((ref Rigidbody rb, ref BoxCollider box) => 
         {
             //some logic
         });
