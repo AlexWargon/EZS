@@ -147,7 +147,7 @@ public class UpdateSystemMultyThreadExample  : UpdateSystem
 {
     public override void Update() 
     {
-        entities.EachThreaded((ref Rigidbody rb, ref RayCast ray, ref Impact impact, ref CanReflect reflect, ref BossTag tag) => 
+        entities.EachThreaded((ref RigidBody rb, ref RayCast ray, ref Impact impact, ref CanReflect reflect, ref BossTag tag) => 
         {
             //some logic
         });
@@ -157,11 +157,11 @@ public class UpdateSystemMultyThreadExample  : UpdateSystem
 ```
 3. You can filter entities not only by including components, but also by exluding
 ```C#
-public class WuthoutSystemExample  : UpdateSystem 
+public class WithoutSystemExample  : UpdateSystem 
 {
     public override void Update() 
     {
-        entities.Without<UnActive, PlayerTag>().EachThreaded((ref Rigidbody rb, ref RayCast ray, ref Impact impact, ref CanReflect reflect, ref BossTag tag) => 
+        entities.Without<UnActive, PlayerTag>().EachThreaded((ref RigidBody rb, ref RayCast ray, ref Impact impact, ref CanReflect reflect, ref BossTag tag) => 
         {
             //some logic
         });
