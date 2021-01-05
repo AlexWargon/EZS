@@ -27,13 +27,16 @@ systemsLate.Init();
 ```
 Call update of systems in your update loop
 ```
-private void GameUpdateLoop(){
+private void GameUpdateLoop()
+{
     systems.OnUpdate();
 }
-private void GameFixedUpdateLoop(){
+private void GameFixedUpdateLoop()
+{
     systemsFixed.OnUpdate();
 }
-private void GameLateUpdateLoop(){
+private void GameLateUpdateLoop()
+{
     systemsLate.OnUpdate();
 }
 ```
@@ -66,10 +69,12 @@ entity.Destroy();
 Components are just structs with public fields
 Examples:
 ```
-public struct Health { 
+public struct Health 
+{ 
     public int value;
 }
-public struct TransformRef{
+public struct TransformRef
+{
     public Transform value;
 }
 ```
@@ -79,9 +84,12 @@ public struct TransformRef{
 
 ```
 //Type of systems that will execute every time when you call systems.OnUpdate();
-public class UpdateExampleSystem : UpdateSystem {
-    public override void Update() {
-        entities.Each((ref Entity entity, ref Heal heal, ref Health health) => {
+public class UpdateExampleSystem : UpdateSystem 
+{
+    public override void Update() 
+    {
+        entities.Each((ref Entity entity, ref Heal heal, ref Health health) => 
+        {
             health.value += heal.value;
             heal.value--;
             if(heal.value <= 0)
@@ -93,9 +101,12 @@ public class UpdateExampleSystem : UpdateSystem {
 # 2. Reactive systems
 a) Call system when component added to some entity   
 ```
-public class DamageSystem : OnAdd<Damaged> {
-    public override void Execute() {
-        entities.Each((ref Health heath, ref Damaged damage) => {
+public class DamageSystem : OnAdd<Damaged> 
+{
+    public override void Execute() 
+    {
+        entities.Each((ref Health heath, ref Damaged damage) => 
+        {
             heath.value -= damage.value;
         });
     }
@@ -104,8 +115,10 @@ public class DamageSystem : OnAdd<Damaged> {
 
 b) Call system when component removed from some entity
 ```
-public class OnRemoveSystem : OnRemove<SomeComponent> {
-    public override void Execute() {
+public class OnRemoveSystem : OnRemove<SomeComponent> 
+{
+    public override void Execute() 
+    {
         //some logic
     }
 }
@@ -115,21 +128,30 @@ public class OnRemoveSystem : OnRemove<SomeComponent> {
 
 ```
 //execute logic from each entity that has the components specified in it
-public class UpdateSystemSingleThreadExample : UpdateSystem {
-    public override void Update() {
-        entities.Each((ref Rigidbody rb, ref BoxCollider box, ref) => {
+
+public class UpdateSystemSingleThreadExample : UpdateSystem 
+{
+    public override void Update() 
+    {
+        entities.Each((ref Rigidbody rb, ref BoxCollider box, ref) => 
+        {
             //some logic
         });
     }
 }
+
 ```
 2. entities.EachThreaded((..........)=>{.....});
 ```
 //same think like entities.Each(()=>), but use all threads of CPU!!!
 //p.s. it won't work with unity object types like Transform, GameObject, Rigidbody and others :C
-public class UpdateSystemMultyThreadExample  : UpdateSystem {
-    public override void Update() {
-        entities.EachThreaded((ref Rigidbody rb, ref RayCast ray, ref Impact impact, ref CanReflect reflect, ref BossTag tag) => {
+
+public class UpdateSystemMultyThreadExample  : UpdateSystem 
+{
+    public override void Update() 
+    {
+        entities.EachThreaded((ref Rigidbody rb, ref RayCast ray, ref Impact impact, ref CanReflect reflect, ref BossTag tag) => 
+        {
             //some logic
         });
     }
