@@ -147,7 +147,7 @@ public class UpdateSystemMultyThreadExample  : UpdateSystem
 {
     public override void Update() 
     {
-        entities.EachThreaded((ref RigidBody rb, ref RayCast ray, ref Impact impact, ref CanReflect reflect, ref BossTag tag) => 
+        entities.EachThreaded((ref Position pos, ref RayCast ray, ref Impact impact, ref CanReflect reflect, ref BossTag tag) => 
         {
             //some logic
         });
@@ -161,7 +161,7 @@ public class WithoutSystemExample  : UpdateSystem
 {
     public override void Update() 
     {
-        entities.Without<UnActive, PlayerTag>().EachThreaded((ref RigidBody rb, ref RayCast ray, ref Impact impact, ref CanReflect reflect, ref BossTag tag) => 
+        entities.Without<UnActive, PlayerTag>().EachThreaded((ref Position pos, ref RayCast ray, ref Impact impact, ref CanReflect reflect, ref BossTag tag) => 
         {
             //some logic
         });
