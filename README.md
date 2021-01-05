@@ -81,8 +81,7 @@ public struct TransformRef
 ```
 # You can use two cinds of systems : 
 
-# 1. Update systems
-
+1. Update systems
 ```C#
 //Type of systems that will execute every time when you call systems.OnUpdate();
 public class UpdateExampleSystem : UpdateSystem 
@@ -96,9 +95,10 @@ public class UpdateExampleSystem : UpdateSystem
     }
 }
 ```
-# 2. Reactive systems
-a) Call system when component added to some entity   
+2. Reactive systems
+   
 ```C#
+//Call system when component added to some entity
 public class DamageSystem : OnAdd<Damaged> 
 {
     public override void Execute() 
@@ -111,8 +111,8 @@ public class DamageSystem : OnAdd<Damaged>
 }
 ```
 
-b) Call system when component removed from some entity
 ```C#
+//Call system when component removed from some entity
 public class OnRemoveSystem : OnRemove<SomeComponent> 
 {
     public override void Execute() 
