@@ -91,10 +91,7 @@ public class UpdateExampleSystem : UpdateSystem
     {
         entities.Each((ref Entity entity, ref Heal heal, ref Health health) => 
         {
-            health.value += heal.value;
-            heal.value--;
-            if(heal.value <= 0)
-                entity.Remove<Heal>();
+
         });
     }
 }
@@ -108,7 +105,7 @@ public class DamageSystem : OnAdd<Damaged>
     {
         entities.Each((ref Health heath, ref Damaged damage) => 
         {
-            heath.value -= damage.value;
+        
         });
     }
 }
