@@ -3,24 +3,42 @@ C# Entity Component System (ECS) based on struct components
 
 Inspired by LeoECS https://github.com/Leopotam/ecs and UnityECS
 
+# How install:
+Just copy source folder in assets folder of your game
 
 # How it works:
 
 Init World and Systems
 ```
-world = new World();
-systems = new Systems(world);
-systems .Add(new PlayerMoveSystem())
-        .AddReactive(new HealSystem())
-        .AddReactive(new DamageSystem());
+var world = new World();
+var systems = new Systems(world);
+systems .Add(new PlayerMoveSystem())  //Add update system
+        .AddReactive(new HealSystem())  //Add reactive system
+        .AddReactive(new DamageSystem()); //Add reactive system
+        
+//You can use multiple Systems objects with one world
+var systemsFixed = new Systems(world);
+var systemsLate = new Systems(world);
+
 systems.Init();
+systemsFixed.Init();
+systemsLate.Init();
+
 ```
 Call update of systems in your update loop
 ```
 private void GameUpdateLoop(){
     systems.OnUpdate();
 }
+private void GameFixedUpdateLoop(){
+    systems.OnUpdate();
+}
+private void GameLateUpdateLoop(){
+    systems.OnUpdate();
+}
 ```
+
+
 Work with entities
 ```
 //create new entity
@@ -93,7 +111,7 @@ public class OnRemoveSystem : OnRemove<SomeComponent> {
 }
 ```
 # System Loops: SingleThread and MultyThread:
-1. entities.Each(()=>{});
+1. entities.Each((..........)=>{....});
 
 ```
 //execute logic from each entity that has the components specified in it
@@ -105,7 +123,7 @@ public class UpdateSystemSingleThreadExample : UpdateSystem {
     }
 }
 ```
-2. entities.EachThreaded(()=>{});
+2. entities.EachThreaded((..........)=>{.....});
 ```
 //same think like entities.Each(()=>), but use all threads of CPU!!!
 //p.s. it won't work with unity object types like Transform, GameObject, Rigidbody and others :C
