@@ -90,7 +90,7 @@ public class UpdateExampleSystem : UpdateSystem
     {
         entities.Each((ref Entity entity, ref Heal heal, ref Health health) => 
         {
-
+                //some logic
         });
     }
 }
@@ -105,7 +105,7 @@ public class DamageSystem : OnAdd<Damaged>
     {
         entities.Each((ref Health heath, ref Damaged damage) => 
         {
-        
+                //some logic
         });
     }
 }
