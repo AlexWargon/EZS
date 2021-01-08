@@ -23,6 +23,7 @@ namespace Wargon.ezs
         {
             for (int i = 0; i < updateSystemsList.Count; i++)
                 updateSystemsList.Items[i].Update();
+            Alive = true;
         }
         public Systems Add(UpdateSystem system)
         {
