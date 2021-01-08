@@ -79,7 +79,7 @@ public struct TransformRef
     public Transform value;
 }
 ```
-# You can use two cinds of systems : 
+# You can use two kinds of systems : 
 
 1. Update systems
 ```C#
