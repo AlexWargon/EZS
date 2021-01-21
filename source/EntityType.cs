@@ -32,7 +32,7 @@ namespace Wargon.ezs
                 Array.Resize(ref entities, entities.Length << 1);
             }
             entities[Count] = entity.id;
-            entitiesMap[entity.id] = Count;
+            entitiesMap.Add(entity.id, Count);
             Count++;
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

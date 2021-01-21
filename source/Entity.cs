@@ -1,5 +1,6 @@
 using System;
 using System.Runtime.CompilerServices;
+using UnityEngine;
 
 namespace Wargon.ezs
 {
@@ -14,7 +15,11 @@ namespace Wargon.ezs
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Add<A>(A component)
         {
-            if (Has<A>()) return;
+            if (Has<A>())
+            {
+                Debug.Log($"Entity already has {typeof(A).Name} Component");
+                return;
+            }
 
             ref var data = ref World.GetEntityData(id);
             if (data.Generation != Generation) throw new Exception("ENTITY NULL OR DESTROYED");
@@ -33,6 +38,7 @@ namespace Wargon.ezs
         {
             if (Has<A>())
                 return ref World.GetPool<A>().Items[id];
+            
             ref var data = ref World.GetEntityData(id);
             if (data.Generation != Generation) throw new Exception("ENTITY NULL OR DESTROYED");
             if (data.ComponentTypes.Length == data.ComponentsCount)
@@ -49,9 +55,8 @@ namespace Wargon.ezs
             return ref pool.Items[id];
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Add<A>()
+        public ref A Add<A>()
         {
-            if (Has<A>()) return;
             ref var data = ref World.GetEntityData(id);
             if (data.Generation != Generation) throw new Exception("ENTITY NULL OR DESTROYED");
             if (data.ComponentTypes.Length == data.ComponentsCount)
@@ -61,38 +66,49 @@ namespace Wargon.ezs
             var type = ComponentType<A>.ID;
             data.ComponentTypes[data.ComponentsCount] = type;
             data.ComponentsCount++;
+            var pool = World.GetPool<A>();
+            pool.Set(default, id);
             World.OnAddComponent(this, ref data, type);
+
+            return ref pool.Items[id];
         }
+        
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Remove<A>()
         {
-            ref var data = ref World.GetEntityData(id);
-            if (data.Generation != Generation) throw new Exception("ENTITY NULL OR DESTROYED");
-            var typeId = ComponentType<A>.ID;
-            for (var i = 0; i < data.ComponentsCount; i++)
+            ref EntityData data = ref World.GetEntityData(id);
+            if (data.Generation != Generation)
+                throw new Exception("ENTITY NULL OR DESTROYED");
+            int typeId = ComponentType<A>.ID;
+            for (int i = 0; i < data.ComponentsCount; ++i)
             {
-                if (data.ComponentTypes[i] != typeId) continue;
-                data.ComponentTypes[i] = data.ComponentTypes[data.ComponentsCount - 1];
-                data.ComponentTypes[data.ComponentsCount - 1] = 0;
-                data.ComponentsCount--;
-                World.OnRemoveComponent(this, data, typeId);
-                return;
+                if (data.ComponentTypes[i] == typeId)
+                {
+                    data.ComponentTypes[i] = data.ComponentTypes[data.ComponentsCount - 1];
+                    data.ComponentTypes[data.ComponentsCount - 1] = 0;
+                    --data.ComponentsCount;
+                    World.OnRemoveComponent(in this, in data, typeId);
+                    break;
+                }
             }
         }
+        
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void RemoveByTypeID(int index)
+        public void RemoveByTypeID(int typeId)
         {
             ref var data = ref World.GetEntityData(id);
-            if (data.Generation != Generation) throw new Exception("ENTITY NULL OR DESTROYED");
-            var typeId = data.ComponentTypes[index];
+            if (data.Generation != Generation) 
+                throw new Exception("ENTITY NULL OR DESTROYED");
             for (var i = 0; i < data.ComponentsCount; i++)
             {
-                if (data.ComponentTypes[i] != typeId) continue;
-                data.ComponentTypes[i] = data.ComponentTypes[data.ComponentsCount - 1];
-                data.ComponentTypes[data.ComponentsCount - 1] = 0;
-                data.ComponentsCount--;
-                World.OnRemoveComponent(this, data, typeId);
-                return;
+                if (data.ComponentTypes[i] == typeId)
+                {
+                    data.ComponentTypes[i] = data.ComponentTypes[data.ComponentsCount - 1];
+                    data.ComponentTypes[data.ComponentsCount - 1] = 0;
+                    --data.ComponentsCount;
+                    World.OnRemoveComponent(in this, in data, typeId);
+                    break;
+                }
             }
         }
 
@@ -168,7 +184,7 @@ namespace Wargon.ezs
     public struct EntityData
     {
         public int id;
-        public short ComponentsCount;
+        public int ComponentsCount;
         public int[] ComponentTypes;
         public int Generation;
         public bool Active;

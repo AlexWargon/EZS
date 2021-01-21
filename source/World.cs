@@ -29,7 +29,7 @@ namespace Wargon.ezs
         /// public for unity extension
         /// </summary>
         public IPool[] ComponentPools;
-        private int entitiesCount = 0;
+        private int entitiesCount;
         private int freeEntitiesCount = 0;
         private int usedComponentsCount;
         public bool Alive;
@@ -46,7 +46,6 @@ namespace Wargon.ezs
             entities = new Entity[EntityCachSize];
             freeEntities = new GrowList<int>(EntityCachSize);
             systems = new TypeMap<int, Systems>(12);
-            entitiesCount = 0;
             Entities = new Entities(this);
             Alive = true;
         }
@@ -60,8 +59,10 @@ namespace Wargon.ezs
         }
         public void Destroy()
         {
-            Console.WriteLine($"entitiesCount {entitiesCount}");
-
+            for (var i = 0; i < systems.Count; i++)
+            {
+                systems[i].Kill();
+            }
             Array.Clear(entities, 0, entitiesCount);
             Array.Clear(entityData, 0, entitiesCount);
             Array.Clear(freeEntities.Items, 0, freeEntitiesCount);
@@ -112,8 +113,7 @@ namespace Wargon.ezs
                 var entityType = Entities.EntityTypes.Values.Items[index];
                 entityType.Remove(entity);
             }
-
-            //checkEntityTypesWithOut
+            
             for (var index = 0; index < Entities.Withouts.Count; index++)
             {
                 var withOut = Entities.Withouts.Values.Items[index];
@@ -205,14 +205,12 @@ namespace Wargon.ezs
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal void OnRemoveComponent<A>(in Entity entity, EntityData data)
         {
-            //checkArchetypes
             for (int index = 0, iMax = Entities.EntityTypes.Values.Count; index < iMax; index++)
             {
                 var entityType = Entities.EntityTypes.Values[index];
                 entityType.Remove(entity);
             }
-
-            //checkArchetypesWithOut
+            
             for (int index = 0, indexMax = Entities.Withouts.Values.Count; index < indexMax; index++)
             {
                 var withOut = Entities.Withouts.Values[index];
@@ -231,14 +229,12 @@ namespace Wargon.ezs
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal void OnRemoveComponent(in Entity entity, in EntityData data, int typeID)
         {
-            //checkArchetypes
             for (int index = 0, iMax = Entities.EntityTypes.Values.Count; index < iMax; index++)
             {
                 var entityType = Entities.EntityTypes.Values[index];
                 entityType.Remove(entity);
             }
 
-            //checkArchetypesWithOut
             for (int index = 0, iMax = Entities.Withouts.Values.Count; index < iMax; index++)
             {
                 var withOut = Entities.Withouts.Values[index];

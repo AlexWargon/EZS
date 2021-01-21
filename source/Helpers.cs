@@ -40,11 +40,22 @@ namespace Wargon.ezs
             }
             Items[id] = component;
         }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ref T GetItem(int id)
+        {
+            return ref Items[id];
+        }
+
+        object IPool.GetItem(int id)
+        {
+            return Items[id];
+        }
     }
     public interface IPool
     {
         Type ItemType { get; }
         void Default(int id);
+        object GetItem(int id);
     }
     internal class TypeMap<TKey, TValue>
     {
@@ -75,7 +86,7 @@ namespace Wargon.ezs
         {
             return Values.Items[_indexMap[key]];
         }
-
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Clear()
         {
             Array.Clear(Values.Items, 0, Values.Items.Length);
@@ -121,7 +132,7 @@ namespace Wargon.ezs
         {
             Count--;
         }
-
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Clear()
         {
             Array.Clear(Items,0,Items.Length);
