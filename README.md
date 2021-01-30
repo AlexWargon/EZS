@@ -79,7 +79,7 @@ public struct TransformRef
     public Transform value;
 }
 ```
-# You can use two kinds of systems : 
+# Systems : 
 
 1. Update systems
 ```C#
@@ -95,8 +95,8 @@ public class UpdateExampleSystem : UpdateSystem
     }
 }
 ```
-2. Reactive systems
-   
+
+2. Reactive systems 
 ```C#
 //Call system when component added to some entity
 public class DamageSystem : OnAdd<Damaged> 
@@ -110,7 +110,6 @@ public class DamageSystem : OnAdd<Damaged>
     }
 }
 ```
-
 ```C#
 //Call system when component removed from some entity
 public class OnRemoveSystem : OnRemove<SomeComponent> 
@@ -118,6 +117,36 @@ public class OnRemoveSystem : OnRemove<SomeComponent>
     public override void Execute() 
     {
         //some logic
+    }
+}
+```
+
+3. Init systems
+```C#
+//Call system at start of world live
+public class DamageSystem : InitSystem
+{
+    public override void Execute() 
+    {
+        entities.Each((ref Health heath, ref Damaged damage) => 
+        {
+            //some logic
+        });
+    }
+}
+```
+
+3. Destroy systems
+```C#
+//Call system during the destruction of the world
+public class DamageSystem : DestroySystem
+{
+    public override void Execute() 
+    {
+        entities.Each((ref Health heath, ref Damaged damage) => 
+        {
+            //some logic
+        });
     }
 }
 ```
