@@ -13,7 +13,7 @@ Init World and Systems
 ```C#
 var world = new World();
 var systems = new Systems(world);
-systems .Add(new PlayerMoveSystem())  //Add update system
+systems .Add(new PlayerMoveSystem())  //Add update/init/destroy system
         .AddReactive(new HealSystem())  //Add reactive system
         .AddReactive(new DamageSystem()); //Add reactive system
         
