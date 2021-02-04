@@ -136,7 +136,7 @@ public class DamageSystem : InitSystem
 }
 ```
 
-3. Destroy systems
+4. Destroy systems
 ```C#
 //Call system during the destruction of the world
 public class DamageSystem : DestroySystem
