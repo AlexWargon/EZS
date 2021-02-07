@@ -103,10 +103,7 @@ public class DamageSystem : OnAdd<Damaged>
 {
     public override void Execute() 
     {
-        entities.Each((ref Health heath, ref Damaged damage) => 
-        {
-                //some logic
-        });
+        //some logic
     }
 }
 ```
@@ -124,7 +121,7 @@ public class OnRemoveSystem : OnRemove<SomeComponent>
 3. Init systems
 ```C#
 //Call system at start of world live
-public class DamageSystem : InitSystem
+public class InitExampleSystem : InitSystem
 {
     public override void Execute() 
     {
@@ -139,7 +136,7 @@ public class DamageSystem : InitSystem
 4. Destroy systems
 ```C#
 //Call system during the destruction of the world
-public class DamageSystem : DestroySystem
+public class DestroyExampleSystem : DestroySystem
 {
     public override void Execute() 
     {
@@ -155,7 +152,7 @@ public class DamageSystem : DestroySystem
 ```C#
 //execute logic for each entity that has the components specified in it
 
-public class UpdateSystemSingleThreadExample : UpdateSystem 
+public class SingleThreadExampleUpdateSystem : UpdateSystem 
 {
     public override void Update() 
     {
@@ -172,7 +169,7 @@ public class UpdateSystemSingleThreadExample : UpdateSystem
 //same think like entities.Each(()=>), but use all threads of CPU!!!
 //p.s. it won't work with unity object types like Transform, GameObject, Rigidbody and others :C
 
-public class UpdateSystemMultyThreadExample  : UpdateSystem 
+public class MultyThreadExampleUpdateSystem  : UpdateSystem 
 {
     public override void Update() 
     {
