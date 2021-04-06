@@ -1,6 +1,6 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-![EZS_LOGO_2](https://user-images.githubusercontent.com/37613162/113646769-2c721e00-9692-11eb-990e-b7f0e4e7ad41.png)
+![EZS_LOGO_22](https://user-images.githubusercontent.com/37613162/113684924-62cd8e80-96ce-11eb-8069-6923d4972dd1.png)
 # EZS
 
 C# Entity Component System (ECS) based on struct components
