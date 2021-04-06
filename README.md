@@ -5,7 +5,7 @@
 
 C# Entity Component System (ECS) based on struct components
 
-Inspired by LeoECS https://github.com/Leopotam/ecs and UnityECS
+Inspired by [LeoECS](https://github.com/Leopotam/ecs) and [Entities](https://docs.unity3d.com/Packages/com.unity.entities@0.17/manual/index.html)
 
 # How install:
 Just copy source folder in assets folder of your game
