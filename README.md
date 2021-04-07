@@ -1,8 +1,11 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+![EZS_LOGO_22](https://user-images.githubusercontent.com/37613162/113684924-62cd8e80-96ce-11eb-8069-6923d4972dd1.png)
 # EZS
+
 C# Entity Component System (ECS) based on struct components
 
-Inspired by LeoECS https://github.com/Leopotam/ecs and UnityECS
+Inspired by [LeoECS](https://github.com/Leopotam/ecs) and [Entities](https://docs.unity3d.com/Packages/com.unity.entities@0.17/manual/index.html)
 
 # How install:
 Just copy source folder in assets folder of your game
