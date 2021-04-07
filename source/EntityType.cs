@@ -4,17 +4,43 @@ using System.Runtime.CompilerServices;
 
 namespace Wargon.ezs
 {
+    public struct Enumerator : IDisposable {
+        
+        readonly int count;
+        int index;
+
+        [MethodImpl (MethodImplOptions.AggressiveInlining)]
+        internal Enumerator (EntityType entityType) {
+
+            count = entityType.Count;
+            index = -1;
+        }
+        public int Current {
+            [MethodImpl (MethodImplOptions.AggressiveInlining)]
+            get => index;
+        }
+        [MethodImpl (MethodImplOptions.AggressiveInlining)]
+        public void Dispose () {
+            
+        }
+
+        [MethodImpl (MethodImplOptions.AggressiveInlining)]
+        public bool MoveNext () {
+            return ++index < count;
+        }
+    }
+
     public abstract class EntityType
     {
-        protected int[] entities;
-        protected Dictionary<int, int> entitiesMap;
+        internal int[] entities;
+        private readonly Dictionary<int, int> entitiesMap;
         public int[] IncludTypes;
         public int[] ExcludeTypes;
         public int IncludCount;
         public int ExludeCount;
         public int Count;
-        public Type Type;
-        protected World world;
+        public readonly Type Type;
+        private readonly World world;
         internal EntityType(World world)
         {
             this.world = world;
@@ -70,9 +96,10 @@ namespace Wargon.ezs
         internal bool HasExcludeType<A>()
         {
             var typeID = ComponentType<A>.ID;
-            for (var i = 0; i < ExcludeTypes.Length; i++)
-                if (typeID == ExcludeTypes[i])
+            foreach (var t in ExcludeTypes)
+                if (typeID == t)
                     return true;
+
             return false;
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -84,7 +111,7 @@ namespace Wargon.ezs
             return false;
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal ref Entity GetEntityByIndex(int index)
+        internal ref Entity GetEntity(int index)
         {
             return ref world.GetEntity(entities[index]);
         }
@@ -99,28 +126,31 @@ namespace Wargon.ezs
         {
             return ref world.GetEntityData(entities[index]);
         }
+        [MethodImpl (MethodImplOptions.AggressiveInlining)]
+        public Enumerator GetEnumerator () {
+            return new Enumerator (this);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool IsEmpty() => Count < 1;
     }
 
     public class EntityType<A> : EntityType
     {
-        private Pool<A> pool;
+        internal Pool<A> poolA;
         public EntityType(World world) : base(world)
         {
             IncludTypes = new[] {
                 ComponentType<A>.ID
             };
             IncludCount = 1;
-            pool = world.GetPool<A>();
+            poolA = world.GetPool<A>();
         }
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal A Get(int entityID)
+        internal ref A GetA(int index)
         {
-            return pool.Items[entityID];
-        }
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal ref A GetByIndexA(int index)
-        {
-            return ref pool.Items[entities[index]];
+            return ref poolA.items[entities[index]];
         }
 
         public class WithOut<NA> : EntityType<A>
@@ -148,8 +178,8 @@ namespace Wargon.ezs
 
     public class EntityType<A, B> : EntityType
     {
-        private Pool<A> poolA;
-        private Pool<B> poolB;
+        internal Pool<A> poolA;
+        internal Pool<B> poolB;
 
         public EntityType(World world) : base(world)
         {
@@ -163,29 +193,15 @@ namespace Wargon.ezs
 
         }
 
-        public void ForEach<A, B>(Entities.Lambda<A, B> lambda)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal ref A GetA(int index)
         {
-
+            return ref poolA.items[entities[index]];
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal ref A GetA(int entityID)
+        internal ref B GetB(int index)
         {
-            return ref poolA.Items[entityID];
-        }
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal ref B GetB(int entityID)
-        {
-            return ref poolB.Items[entityID];
-        }
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal ref A GetByIndexA(int index)
-        {
-            return ref poolA.Items[entities[index]];
-        }
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal ref B GetByIndexB(int index)
-        {
-            return ref poolB.Items[entities[index]];
+            return ref poolB.items[entities[index]];
         }
         public class WithOut<NA> : EntityType<A, B>
         {
@@ -213,9 +229,9 @@ namespace Wargon.ezs
 
     public class EntityType<A, B, C> : EntityType
     {
-        private Pool<A> poolA;
-        private Pool<B> poolB;
-        private Pool<C> poolС;
+        internal Pool<A> poolA;
+        internal Pool<B> poolB;
+        internal Pool<C> poolС;
         public EntityType(World world) : base(world)
         {
             IncludTypes = new[] {
@@ -229,19 +245,19 @@ namespace Wargon.ezs
             poolС = world.GetPool<C>();
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal ref A GetByIndexA(int index)
+        internal ref A GetA(int index)
         {
-            return ref poolA.Items[entities[index]];
+            return ref poolA.items[entities[index]];
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal ref B GetByIndexB(int index)
+        internal ref B GetB(int index)
         {
-            return ref poolB.Items[entities[index]];
+            return ref poolB.items[entities[index]];
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal ref C GetByIndexC(int index)
+        internal ref C GetC(int index)
         {
-            return ref poolС.Items[entities[index]];
+            return ref poolС.items[entities[index]];
         }
         public class Without<NA> : EntityType<A, B, C>
         {
@@ -267,10 +283,10 @@ namespace Wargon.ezs
     }
     public class EntityType<A, B, C, D> : EntityType
     {
-        private Pool<A> poolA;
-        private Pool<B> poolB;
-        private Pool<C> poolС;
-        private Pool<D> poolD;
+        internal Pool<A> poolA;
+        internal Pool<B> poolB;
+        internal Pool<C> poolС;
+        internal Pool<D> poolD;
         public EntityType(World world) : base(world)
         {
             IncludTypes = new int[] {
@@ -286,24 +302,24 @@ namespace Wargon.ezs
             poolD = world.GetPool<D>();
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal ref A GetByIndexA(int index)
+        internal ref A GetA(int index)
         {
-            return ref poolA.Items[entities[index]];
+            return ref poolA.items[entities[index]];
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal ref B GetByIndexB(int index)
+        internal ref B GetB(int index)
         {
-            return ref poolB.Items[entities[index]];
+            return ref poolB.items[entities[index]];
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal ref C GetByIndexC(int index)
+        internal ref C GetC(int index)
         {
-            return ref poolС.Items[entities[index]];
+            return ref poolС.items[entities[index]];
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal ref D GetByIndexD(int index)
+        internal ref D GetD(int index)
         {
-            return ref poolD.Items[entities[index]];
+            return ref poolD.items[entities[index]];
         }
         public class WithOut<NA> : EntityType<A, B, C, D>
         {
@@ -330,11 +346,11 @@ namespace Wargon.ezs
 
     public class EntityType<A, B, C, D, E> : EntityType
     {
-        private Pool<A> poolA;
-        private Pool<B> poolB;
-        private Pool<C> poolС;
-        private Pool<D> poolD;
-        private Pool<E> poolE;
+        internal Pool<A> poolA;
+        internal Pool<B> poolB;
+        internal Pool<C> poolС;
+        internal Pool<D> poolD;
+        internal Pool<E> poolE;
         public EntityType(World world) : base(world)
         {
             IncludTypes = new[] {
@@ -352,29 +368,29 @@ namespace Wargon.ezs
             poolE = world.GetPool<E>();
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal ref A GetByIndexA(int index)
+        internal ref A GetA(int index)
         {
-            return ref poolA.Items[entities[index]];
+            return ref poolA.items[entities[index]];
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal ref B GetByIndexB(int index)
+        internal ref B GetB(int index)
         {
-            return ref poolB.Items[entities[index]];
+            return ref poolB.items[entities[index]];
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal ref C GetByIndexC(int index)
+        internal ref C GetC(int index)
         {
-            return ref poolС.Items[entities[index]];
+            return ref poolС.items[entities[index]];
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal ref D GetByIndexD(int index)
+        internal ref D GetD(int index)
         {
-            return ref poolD.Items[entities[index]];
+            return ref poolD.items[entities[index]];
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal ref E GetByIndexE(int index)
+        internal ref E GetE(int index)
         {
-            return ref poolE.Items[entities[index]];
+            return ref poolE.items[entities[index]];
         }
         public class WithOut<NA> : EntityType<A, B, C, D, E>
         {
@@ -398,4 +414,83 @@ namespace Wargon.ezs
             }
         }
     }
+    public class EntityType<A, B, C, D, E, F> : EntityType
+    {
+        internal Pool<A> poolA;
+        internal Pool<B> poolB;
+        internal Pool<C> poolС;
+        internal Pool<D> poolD;
+        internal Pool<E> poolE;
+        internal Pool<F> poolF;
+        public EntityType(World world) : base(world)
+        {
+            IncludTypes = new[] {
+                ComponentType<A>.ID,
+                ComponentType<B>.ID,
+                ComponentType<C>.ID,
+                ComponentType<D>.ID,
+                ComponentType<E>.ID,
+                ComponentType<F>.ID
+            };
+            IncludCount = 6;
+            poolA = world.GetPool<A>();
+            poolB = world.GetPool<B>();
+            poolС = world.GetPool<C>();
+            poolD = world.GetPool<D>();
+            poolE = world.GetPool<E>();
+            poolF = world.GetPool<F>();
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal ref A GetA(int index)
+        {
+            return ref poolA.items[entities[index]];
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal ref B GetB(int index)
+        {
+            return ref poolB.items[entities[index]];
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal ref C GetC(int index)
+        {
+            return ref poolС.items[entities[index]];
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal ref D GetD(int index)
+        {
+            return ref poolD.items[entities[index]];
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal ref E GetE(int index)
+        {
+            return ref poolE.items[entities[index]];
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal ref F GetF(int index)
+        {
+            return ref poolF.items[entities[index]];
+        }
+        public class WithOut<NA> : EntityType<A, B, C, D, E, F>
+        {
+            public WithOut(World world) : base(world)
+            {
+                ExludeCount = 1;
+                ExcludeTypes = new[] {
+                    ComponentType<NA>.ID
+                };
+            }
+        }
+        public class WithOut<NA, NB> : EntityType<A, B, C, D, E, F>
+        {
+            public WithOut(World world) : base(world)
+            {
+                ExludeCount = 2;
+                ExcludeTypes = new[] {
+                    ComponentType<NA>.ID,
+                    ComponentType<NB>.ID
+                };
+            }
+        }
+    }
+
 }

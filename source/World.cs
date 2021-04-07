@@ -1,5 +1,7 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Runtime.CompilerServices;
+using UnityEngine;
 
 namespace Wargon.ezs
 {
@@ -9,7 +11,7 @@ namespace Wargon.ezs
         public static int EntityCachSize = 1024;
         public static int PoolsCachSize = 128;
         public static int EntityTypesCachSize = 128;
-        public static int EntityComponentCount = 24;
+        public static int EntityComponentCount = 16;
     }
     public class World
     {
@@ -18,10 +20,10 @@ namespace Wargon.ezs
         public readonly int PoolsCachSize;
         public readonly int EntityTypesCachSize;
         public readonly int EntityComponentCount;
-        private Entity[] entities;
+        public Entity[] entities;
         private EntityData[] entityData;
         private GrowList<int> freeEntities;
-        internal Entities Entities;
+        public Entities Entities;
 
         private TypeMap<int, Systems> systems;
         private int systemsCount;
@@ -31,8 +33,9 @@ namespace Wargon.ezs
         public IPool[] ComponentPools;
         private int entitiesCount;
         private int freeEntitiesCount = 0;
-        private int usedComponentsCount;
+        internal int usedComponentsCount;
         public bool Alive;
+        public int GetFreeEntitiesCount() => freeEntities.Count;
         public World()
         {
             ComponentCachSize = Configs.ComponentCachSize;
@@ -45,17 +48,28 @@ namespace Wargon.ezs
             entityData = new EntityData[EntityCachSize];
             entities = new Entity[EntityCachSize];
             freeEntities = new GrowList<int>(EntityCachSize);
-            systems = new TypeMap<int, Systems>(12);
+            systems = new TypeMap<int, Systems>(4);
             Entities = new Entities(this);
+            for (var index = 0; index < entities.Length; index++)
+            {
+                var entity = entities[index];
+                entity.world = this;
+            }
+            ComponentTypeMap.World = this;
             Alive = true;
         }
 
         public void AddSystems(Systems add)
         {
-            if (systems.HasKey(add.id)) return;
             add.id = systemsCount;
+            if (systems.HasKey(add.id)) return;
             systems.Add(add.id, add);
             systemsCount++;
+        }
+
+        public GrowList<Systems> GetAllSystems()
+        {
+            return systems.Values;
         }
         public void Destroy()
         {
@@ -80,28 +94,34 @@ namespace Wargon.ezs
         public Entity CreateEntity()
         {
             Entity entity;
-            entity.World = this;
+            entity.world = this;
             if (freeEntities.Count == 0)
             {
-                if (entities.Length == entitiesCount)
+                if (entityData.Length == entitiesCount)
                 {
                     Array.Resize(ref entities, entities.Length << 1);
                     Array.Resize(ref entityData, entityData.Length << 1);
                 }
                 entity.id = entitiesCount;
-                entityData[entity.id].Generation = 1;
-                entity.Generation = entityData[entity.id].Generation;
-                entities[entitiesCount] = entity;
-                entityData[entity.id].id = entity.id;
-                entityData[entity.id].ComponentsCount = 0;
-                entityData[entity.id].ComponentTypes = new int[EntityComponentCount];
+                ref var data = ref entityData[entity.id];
+                data.generation = 1;
+                entity.generation = data.generation;
+                
+                entities[entity.id] = entity;
+                data.componentTypes = new HashSet<int>();
+                data.componentsCount = 0;
+                data.id = entity.id;
+                //data.componentTypes = new int[EntityComponentCount];
+                
                 entitiesCount++;
             }
             else
             {
                 entity.id = freeEntities.Items[--freeEntities.Count];
-                entity.Generation = entityData[entity.id].Generation;
-                entityData[entity.id].ComponentsCount = 0;
+                entity.generation = entityData[entity.id].generation;
+                entityData[entity.id].componentsCount = 0;
+                
+                entities[entity.id] = entity;
             }
             return entity;
         }
@@ -109,22 +129,15 @@ namespace Wargon.ezs
         internal void OnDestroyEntity(in Entity entity)
         {
             for (var index = 0; index < Entities.EntityTypes.Count; index++)
-            {
-                var entityType = Entities.EntityTypes.Values.Items[index];
-                entityType.Remove(entity);
-            }
-            
+                Entities.EntityTypes.Values.Items[index].Remove(entity);
             for (var index = 0; index < Entities.Withouts.Count; index++)
             {
                 var withOut = Entities.Withouts.Values.Items[index];
                 for (var i = 0; i < withOut.EntityTypes.Values.Count; i++)
-                {
-                    var entityType = withOut.EntityTypes.Values.Items[i];
-                    entityType.Remove(entity);
-                }
+                    withOut.EntityTypes.Values.Items[i].Remove(entity);
             }
-            entitiesCount--;
             freeEntities.Add(entity.id);
+            //entitiesCount--;
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public int GetEntitiesCount()
@@ -149,22 +162,6 @@ namespace Wargon.ezs
                 ComponentPools[typeIdx] = pool;
                 usedComponentsCount++;
             }
-
-            return pool;
-        }
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public IPool GetPoolById(int typeIdx)
-        {
-            if (ComponentPools.Length < typeIdx)
-            {
-                var len = ComponentPools.Length << 1;
-                while (len <= typeIdx)
-                {
-                    len <<= 1;
-                }
-                Array.Resize(ref ComponentPools, len);
-            }
-            var pool = ComponentPools[typeIdx];
             return pool;
         }
 
@@ -208,7 +205,8 @@ namespace Wargon.ezs
             for (int index = 0, iMax = Entities.EntityTypes.Values.Count; index < iMax; index++)
             {
                 var entityType = Entities.EntityTypes.Values[index];
-                entityType.Remove(entity);
+                if (!IsCompileByInclude(entityType, data))
+                    entityType.Remove(entity);
             }
             
             for (int index = 0, indexMax = Entities.Withouts.Values.Count; index < indexMax; index++)
@@ -232,7 +230,8 @@ namespace Wargon.ezs
             for (int index = 0, iMax = Entities.EntityTypes.Values.Count; index < iMax; index++)
             {
                 var entityType = Entities.EntityTypes.Values[index];
-                entityType.Remove(entity);
+                if (!IsCompileByInclude(entityType, data))
+                    entityType.Remove(entity);
             }
 
             for (int index = 0, iMax = Entities.Withouts.Values.Count; index < iMax; index++)
@@ -250,28 +249,77 @@ namespace Wargon.ezs
             for (var i = 0; i < systemsCount; i++)
                 systems[i].OnRemove(typeID);
         }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal void OnDeActivateEntity(in Entity entity, EntityData data)
+        {
+            for (int index = 0, iMax = Entities.EntityTypes.Values.Count; index < iMax; index++)
+            {
+                var entityType = Entities.EntityTypes.Values[index];
+                    entityType.Remove(entity);
+            }
+            
+            for (int index = 0, indexMax = Entities.Withouts.Values.Count; index < indexMax; index++)
+            {
+                var withOut = Entities.Withouts.Values[index];
+                for (int i = 0, iMax = withOut.EntityTypes.Values.Count; i < iMax; i++)
+                {
+                    var entityType = withOut.EntityTypes.Values.Items[i];
+                    entityType.Remove(entity);
+                }
+            }
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal void OnActivateEntity(in Entity entity, EntityData data)
+        {
+            for (int index = 0, iMax = Entities.EntityTypes.Values.Count; index < iMax; index++)
+            {
+                var entityType = Entities.EntityTypes.Values[index];
+                if (IsCompileByInclude(entityType, data))
+                    entityType.Add(entity);
+            }
 
+            for (int index = 0, iMax = Entities.Withouts.Values.Count; index < iMax; index++)
+            {
+                var withOut = Entities.Withouts.Values[index];
+                for (var i = 0; i < withOut.EntityTypes.Values.Count; i++)
+                {
+                    var entityType = withOut.EntityTypes.Values.Items[i];
+                    if (IsCompile(entityType, data))
+                        entityType.Add(entity);
+                }
+            }
+        }
         private int solves = 0;
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private bool IsCompile(EntityType entityType, EntityData data)
         {
             solves = 0;
             for (int i = 0, iMax = entityType.ExludeCount; i < iMax; i++)
-                for (var j = 0; j < data.ComponentsCount; j++)
-                    if (entityType.ExcludeTypes[i] == data.ComponentTypes[j])
-                        return false;
+                if(data.componentTypes.Contains(entityType.ExcludeTypes[i]))
+                    return false;
+                // for (var j = 0; j < data.componentsCount; j++)
+                //     if (entityType.ExcludeTypes[i] == data.componentTypes[j])
+                //         return false;
 
             for (int i = 0, iMax = entityType.IncludCount; i < iMax; i++)
             {
-                for (var j = 0; j < data.ComponentsCount; j++)
+                if (data.componentTypes.Contains(entityType.IncludTypes[i]))
                 {
-                    if (entityType.IncludTypes[i] != data.ComponentTypes[j]) continue;
                     solves++;
                     if (solves == entityType.IncludCount)
                     {
                         return true;
                     }
                 }
+                // for (var j = 0; j < data.componentsCount; j++)
+                // {
+                //     if (entityType.IncludTypes[i] != data.componentTypes[j]) continue;
+                //     solves++;
+                //     if (solves == entityType.IncludCount)
+                //     {
+                //         return true;
+                //     }
+                // }
             }
             return false;
         }
@@ -281,15 +329,23 @@ namespace Wargon.ezs
             solves = 0;
             for (int i = 0, iMax = entityType.IncludCount; i < iMax; i++)
             {
-                for (var j = 0; j < data.ComponentsCount; j++)
+                if (data.componentTypes.Contains(entityType.IncludTypes[i]))
                 {
-                    if (entityType.IncludTypes[i] != data.ComponentTypes[j]) continue;
                     solves++;
                     if (solves == entityType.IncludCount)
                     {
                         return true;
                     }
                 }
+                // for (var j = 0; j < data.componentsCount; j++)
+                // {
+                //     if (entityType.IncludTypes[i] != data.componentTypes[j]) continue;
+                //     solves++;
+                //     if (solves == entityType.IncludCount)
+                //     {
+                //         return true;
+                //     }
+                // }
             }
             return false;
         }

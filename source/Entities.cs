@@ -1,7 +1,6 @@
 ﻿using System;
-using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
-
+using System.Runtime.CompilerServices;
 namespace Wargon.ezs
 {
 
@@ -10,6 +9,7 @@ namespace Wargon.ezs
         internal World world;
         internal TypeMap<Type, Entities> Withouts;
         internal TypeMap<Type, EntityType> EntityTypes;
+
         protected int[] excludedTypes;
         protected Type Type;
         public delegate void Lambda<A>(ref A a);
@@ -26,14 +26,14 @@ namespace Wargon.ezs
             Type = GetType();
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public Entities WithOut<NA>()
+        public EntitiesWithout<NA> WithOut<NA>()
         {
             var type = type<EntitiesWithout<NA>>.Value;
             if (!Withouts.HasKey(type))
             {
                 Withouts.Add(type, NewWithout1(ComponentType<NA>.Value));
             }
-            return Withouts.Get(type);
+            return (EntitiesWithout<NA>)Withouts.Get(type);
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public EntitiesWithout<NA, NB> WithOut<NA, NB>()
@@ -74,231 +74,236 @@ namespace Wargon.ezs
             var without = typeof(EntitiesWithout<,>);
             return (Entities)Activator.CreateInstance(without.MakeGenericType(na, nb), new object[] { world });
         }
-
+        
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public virtual void Each<A>(Lambda<A> action)
         {
             var enteties = GetEntityType<A>();
-
-            for (var i = 0; i < enteties.Count; i++)
-                action(ref enteties.GetByIndexA(i));
+            
+            if(enteties.Count < 1) return;
+            for (var index = 0; index < enteties.Count; index++)
+                action(ref enteties.poolA.items[enteties.entities[index]]);
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public virtual void Each<A, B>(Lambda<A, B> action)
         {
-            var enteties = GetEntityType<A, B>();
-
-            for (var i = 0; i < enteties.Count; i++)
-                action(ref enteties.GetByIndexA(i),
-                        ref enteties.GetByIndexB(i));
+            var entities = GetEntityType<A, B>();
+            if(entities.Count < 1) return;
+            for (var index = 0; index < entities.Count; index++)
+                action(ref  entities.poolA.items[entities.entities[index]],
+                        ref entities.poolB.items[entities.entities[index]]);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public virtual void Each<A, B, C>(Lambda<A, B, C> action)
         {
-            var enteties = GetEntityType<A, B, C>();
-
-            for (var i = 0; i < enteties.Count; i++)
-                action(ref enteties.GetByIndexA(i),
-                        ref enteties.GetByIndexB(i),
-                        ref enteties.GetByIndexC(i));
+            var entities = GetEntityType<A, B, C>();
+            if(entities.Count < 1) return;
+            for (var index = 0; index < entities.Count; index++)
+                action( ref entities.poolA.items[entities.entities[index]],
+                        ref entities.poolB.items[entities.entities[index]],
+                        ref entities.poolС.items[entities.entities[index]]);
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public virtual void Each<A, B, C, D>(Lambda<A, B, C, D> action)
         {
-            var enteties = GetEntityType<A, B, C, D>();
-
-            for (var i = 0; i < enteties.Count; i++)
-                action(ref enteties.GetByIndexA(i),
-                        ref enteties.GetByIndexB(i),
-                        ref enteties.GetByIndexC(i),
-                        ref enteties.GetByIndexD(i));
+            var entities = GetEntityType<A, B, C, D>();
+            
+            if(entities.Count < 1) return;
+            for (var index = 0; index < entities.Count; index++)
+                action( ref entities.poolA.items[entities.entities[index]],
+                        ref entities.poolB.items[entities.entities[index]],
+                        ref entities.poolС.items[entities.entities[index]],
+                        ref entities.poolD.items[entities.entities[index]]);
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public virtual void Each<A, B, C, D, E>(Lambda<A, B, C, D, E> action)
         {
-            var enteties = GetEntityType<A, B, C, D, E>();
-
-            for (var i = 0; i < enteties.Count; i++)
-                action(ref enteties.GetByIndexA(i),
-                        ref enteties.GetByIndexB(i),
-                        ref enteties.GetByIndexC(i),
-                        ref enteties.GetByIndexD(i),
-                        ref enteties.GetByIndexE(i));
+            var entities = GetEntityType<A, B, C, D, E>();
+            if(entities.Count < 1) return;
+            for (var index = 0; index < entities.Count; index++)
+                action( ref entities.poolA.items[entities.entities[index]],
+                        ref entities.poolB.items[entities.entities[index]],
+                        ref entities.poolС.items[entities.entities[index]],
+                        ref entities.poolD.items[entities.entities[index]],
+                        ref entities.poolE.items[entities.entities[index]]);
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public virtual void Each<A>(Lambda<Entity, A> action)
         {
-            var enteties = GetEntityType<A>();
-
-            for (var i = 0; i < enteties.Count; i++)
-                action(ref enteties.GetEntityByIndex(i),
-                        ref enteties.GetByIndexA(i));
+            var entities = GetEntityType<A>();
+            if(entities.Count < 1) return;
+            for (var index = 0; index < entities.Count; index++)
+                action(ref entities.GetEntity(index),
+                        ref entities.poolA.items[entities.entities[index]]);
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public virtual void Each<A, B>(Lambda<Entity, A, B> action)
         {
-            var enteties = GetEntityType<A, B>();
-
-            for (var i = 0; i < enteties.Count; i++)
-                action(ref enteties.GetEntityByIndex(i),
-                        ref enteties.GetByIndexA(i),
-                        ref enteties.GetByIndexB(i));
+            var entities = GetEntityType<A, B>();
+            if(entities.Count < 1) return;
+            for (var index = 0; index < entities.Count; index++)
+                action(ref  entities.GetEntity(index),
+                        ref entities.poolA.items[entities.entities[index]],
+                        ref entities.poolB.items[entities.entities[index]]);
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public virtual void Each<A, B, C>(Lambda<Entity, A, B, C> action)
         {
-            var enteties = GetEntityType<A, B, C>();
-
-            for (var i = 0; i < enteties.Count; i++)
-                action(ref enteties.GetEntityByIndex(i),
-                        ref enteties.GetByIndexA(i),
-                        ref enteties.GetByIndexB(i),
-                        ref enteties.GetByIndexC(i));
+            var entities = (EntityType<A, B, C>) GetEntityType(type<EntityType<A, B, C>>.Value);
+            if(entities.Count < 1) return;
+            for (var index = 0; index < entities.Count; index++)
+                action(ref entities.GetEntity(index),
+                        ref entities.poolA.items[entities.entities[index]],
+                        ref entities.poolB.items[entities.entities[index]],
+                        ref entities.poolС.items[entities.entities[index]]);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public virtual void Each<A, B, C, D>(Lambda<Entity, A, B, C, D> action)
         {
-            var enteties = GetEntityType<A, B, C, D>();
-
-            for (var i = 0; i < enteties.Count; i++)
-                action(ref enteties.GetEntityByIndex(i),
-                        ref enteties.GetByIndexA(i),
-                        ref enteties.GetByIndexB(i),
-                        ref enteties.GetByIndexC(i),
-                        ref enteties.GetByIndexD(i));
+            var entities = GetEntityType<A, B, C, D>();
+            if(entities.Count < 1) return;
+            for (var index = 0; index < entities.Count; index++)
+                action(ref entities.GetEntity(index),
+                        ref entities.poolA.items[entities.entities[index]],
+                        ref entities.poolB.items[entities.entities[index]],
+                        ref entities.poolС.items[entities.entities[index]],
+                        ref entities.poolD.items[entities.entities[index]]);
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public virtual void Each<A, B, C, D, E>(Lambda<Entity, A, B, C, D, E> action)
         {
-            var enteties = GetEntityType<A, B, C, D, E>();
+            var entities = GetEntityType<A, B, C, D, E>();
+            if(entities.Count < 1) return;
+            for (var index = 0; index < entities.Count; index++)
+                action(ref entities.GetEntity(index),
+                        ref entities.poolA.items[entities.entities[index]],
+                        ref entities.poolB.items[entities.entities[index]],
+                        ref entities.poolС.items[entities.entities[index]],
+                        ref entities.poolD.items[entities.entities[index]],
+                        ref entities.poolE.items[entities.entities[index]]);
+        }
 
-            for (var i = 0; i < enteties.Count; i++)
-                action(ref enteties.GetEntityByIndex(i),
-                        ref enteties.GetByIndexA(i),
-                        ref enteties.GetByIndexB(i),
-                        ref enteties.GetByIndexC(i),
-                        ref enteties.GetByIndexD(i),
-                        ref enteties.GetByIndexE(i));
+        public void Sss<A>(Action<A> sss)
+        {
+            
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public virtual void EachThreaded<A>(Lambda<A> lambda)
         {
-            var enteties = GetEntityType<A>();
-            Parallel.For(0, enteties.Count, index =>
+            var entities = GetEntityType<A>();
+            Parallel.For(0, entities.Count, i =>
             {
-                lambda(ref enteties.GetByIndexA(index));
+                lambda(ref entities.poolA.items[entities.entities[i]]);
             });
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public virtual void EachThreaded<A, B>(Lambda<A, B> lambda)
         {
-            var enteties = GetEntityType<A, B>();
-            Parallel.For(0, enteties.Count, index =>
+            var entities = GetEntityType<A, B>();
+            Parallel.For(0, entities.Count, index =>
             {
-                lambda(ref enteties.GetByIndexA(index),
-                    ref enteties.GetByIndexB(index));
+                lambda( ref entities.poolA.items[entities.entities[index]],
+                        ref entities.poolB.items[entities.entities[index]]);
             });
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public virtual void EachThreaded<A, B, C>(Lambda<A, B, C> lambda)
         {
-            var enteties = GetEntityType<A, B, C>();
-            Parallel.For(0, enteties.Count, index =>
+            var entities = GetEntityType<A, B, C>();
+            Parallel.For(0, entities.Count, index =>
             {
-                lambda(ref enteties.GetByIndexA(index),
-                    ref enteties.GetByIndexB(index),
-                    ref enteties.GetByIndexC(index));
+                lambda( ref entities.poolA.items[entities.entities[index]],
+                        ref entities.poolB.items[entities.entities[index]],
+                        ref entities.poolС.items[entities.entities[index]]);
             });
-
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public virtual void EachThreaded<A, B, C, D>(Lambda<A, B, C, D> lambda)
         {
-            var enteties = GetEntityType<A, B, C, D>();
-            var count = enteties.Count;
-            Parallel.For(0, count, index =>
+            var entities = GetEntityType<A, B, C, D>();
+            Parallel.For(0, entities.Count, index =>
             {
-                lambda(ref enteties.GetByIndexA(index),
-                    ref enteties.GetByIndexB(index),
-                    ref enteties.GetByIndexC(index),
-                    ref enteties.GetByIndexD(index));
+                lambda( ref entities.poolA.items[entities.entities[index]],
+                        ref entities.poolB.items[entities.entities[index]],
+                        ref entities.poolС.items[entities.entities[index]],
+                        ref entities.poolD.items[entities.entities[index]]);
             });
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public virtual void EachThreaded<A, B, C, D, E>(Lambda<A, B, C, D, E> lambda)
         {
-            var enteties = GetEntityType<A, B, C, D, E>();
-            Parallel.For(0, enteties.Count, index =>
+            var entities = GetEntityType<A, B, C, D, E>();
+            Parallel.For(0, entities.Count, index =>
             {
-                lambda(ref enteties.GetByIndexA(index),
-                    ref enteties.GetByIndexB(index),
-                    ref enteties.GetByIndexC(index),
-                    ref enteties.GetByIndexD(index),
-                    ref enteties.GetByIndexE(index));
+                lambda( ref entities.poolA.items[entities.entities[index]],
+                        ref entities.poolB.items[entities.entities[index]],
+                        ref entities.poolС.items[entities.entities[index]],
+                        ref entities.poolD.items[entities.entities[index]],
+                        ref entities.poolE.items[entities.entities[index]]);
             });
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public virtual void EachThreaded<A>(Lambda<Entity, A> action)
         {
-            var enteties = GetEntityType<A>();
-            Parallel.For(0, enteties.Count, index =>
+            var entities = GetEntityType<A>();
+            Parallel.For(0, entities.Count, i =>
             {
-                action(ref enteties.GetEntityByIndex(index),
-                    ref enteties.GetByIndexA(index));
+                action(ref entities.GetEntity(i),
+                    ref entities.GetA(i));
             });
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public virtual void EachThreaded<A, B>(Lambda<Entity, A, B> action)
         {
-            var enteties = GetEntityType<A, B>();
-            Parallel.For(0, enteties.Count, index =>
+            var entities = GetEntityType<A, B>();
+            Parallel.For(0, entities.Count, index =>
             {
-                action(ref enteties.GetEntityByIndex(index),
-                    ref enteties.GetByIndexA(index),
-                    ref enteties.GetByIndexB(index));
+                action( ref entities.GetEntity(index),
+                        ref entities.poolA.items[entities.entities[index]],
+                        ref entities.poolB.items[entities.entities[index]]);
             });
 
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public virtual void EachThreaded<A, B, C>(Lambda<Entity, A, B, C> action)
         {
-            var enteties = GetEntityType<A, B, C>();
-            Parallel.For(0, enteties.Count, index =>
+            var entities = GetEntityType<A, B, C>();
+            Parallel.For(0, entities.Count, index =>
             {
-                action(ref enteties.GetEntityByIndex(index),
-                    ref enteties.GetByIndexA(index),
-                    ref enteties.GetByIndexB(index),
-                    ref enteties.GetByIndexC(index));
+                action(ref entities.GetEntity(index),
+                        ref entities.poolA.items[entities.entities[index]],
+                        ref entities.poolB.items[entities.entities[index]],
+                        ref entities.poolС.items[entities.entities[index]]);
             });
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public virtual void EachThreaded<A, B, C, D>(Lambda<Entity, A, B, C, D> action)
         {
-            var enteties = GetEntityType<A, B, C, D>();
-            Parallel.For(0, enteties.Count, index =>
+            var entities = GetEntityType<A, B, C, D>();
+            Parallel.For(0, entities.Count, index =>
             {
-                action(ref enteties.GetEntityByIndex(index),
-                    ref enteties.GetByIndexA(index),
-                    ref enteties.GetByIndexB(index),
-                    ref enteties.GetByIndexC(index),
-                    ref enteties.GetByIndexD(index));
+                action(ref entities.GetEntity(index),
+                        ref entities.poolA.items[entities.entities[index]],
+                        ref entities.poolB.items[entities.entities[index]],
+                        ref entities.poolС.items[entities.entities[index]],
+                        ref entities.poolD.items[entities.entities[index]]);
             });
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public virtual void EachThreaded<A, B, C, D, E>(Lambda<Entity, A, B, C, D, E> action)
         {
-            var enteties = GetEntityType<A, B, C, D, E>();
-            Parallel.For(0, enteties.Count, index =>
+            var entities = GetEntityType<A, B, C, D, E>();
+            Parallel.For(0, entities.Count, index =>
             {
-                action(ref enteties.GetEntityByIndex(index),
-                    ref enteties.GetByIndexA(index),
-                    ref enteties.GetByIndexB(index),
-                    ref enteties.GetByIndexC(index),
-                    ref enteties.GetByIndexD(index),
-                    ref enteties.GetByIndexE(index));
+                action(ref entities.GetEntity(index),
+                    ref entities.poolA.items[entities.entities[index]],
+                    ref entities.poolB.items[entities.entities[index]],
+                    ref entities.poolС.items[entities.entities[index]],
+                    ref entities.poolD.items[entities.entities[index]],
+                    ref entities.poolE.items[entities.entities[index]]);
             });
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -318,9 +323,7 @@ namespace Wargon.ezs
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal EntityType<A, B, C> GetEntityType<A, B, C>()
         {
-            if (!EntityTypes.HasKey(type<EntityType<A, B, C>>.Value))
-                EntityTypes.Add(type<EntityType<A, B, C>>.Value, NewEntityType(ComponentType<A>.Value, ComponentType<B>.Value, ComponentType<C>.Value));
-            return (EntityType<A, B, C>)EntityTypes.Get(type<EntityType<A, B, C>>.Value);
+            return (EntityType<A, B, C>)GetEntityType(type<EntityType<A, B, C>>.Value);
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal EntityType<A, B, C, D> GetEntityType<A, B, C, D>()
@@ -336,188 +339,35 @@ namespace Wargon.ezs
                 EntityTypes.Add(type<EntityType<A, B, C, D, E>>.Value, NewEntityType(ComponentType<A>.Value, ComponentType<B>.Value, ComponentType<C>.Value, ComponentType<D>.Value, ComponentType<E>.Value));
             return (EntityType<A, B, C, D, E>)EntityTypes.Get(type<EntityType<A, B, C, D, E>>.Value);
         }
-        internal void InjectArchetype(Type typeA)
-        {
-            var archetype = NewArchetype(typeA);
-            var type = archetype.Type;
-            if (!EntityTypes.HasKey(type))
-            {
-                EntityTypes.Add(type, archetype);
-            }
-        }
 
-        internal void InjectEntityType(Type typeA, Type typeB)
-        {
-            var archetype = NewEntityType(typeA, typeB);
-            var type = archetype.Type;
-            if (!EntityTypes.HasKey(type))
-            {
-                EntityTypes.Add(type, archetype);
-            }
-
-        }
-        internal void InjectEntityType(Type typeA, Type typeB, Type typeC)
-        {
-            var archetype = NewEntityType(typeA, typeB, typeC);
-            var type = archetype.Type;
-            if (!EntityTypes.HasKey(type))
-            {
-                EntityTypes.Add(type, archetype);
-            }
-        }
-        internal void InjectEntityType(Type typeA, Type typeB, Type typeC, Type typeD)
-        {
-
-            var archetype = NewEntityType(typeA, typeB, typeC, typeD);
-            var type = archetype.Type;
-            if (!EntityTypes.HasKey(type))
-            {
-                EntityTypes.Add(type, archetype);
-            }
-        }
-        internal void InjectEntityType(Type typeA, Type typeB, Type typeC, Type typeD, Type typeE)
-        {
-
-            var archetype = NewEntityType(typeA, typeB, typeC, typeD, typeE);
-            var type = archetype.Type;
-            if (!EntityTypes.HasKey(type))
-            {
-                EntityTypes.Add(type, archetype);
-            }
-        }
-        internal void InjectArchetypeWithout1(Type typeA, Type na)
-        {
-            InjectWithout1(na);
-            var archetype = NewEntityTypeWithout1(typeA, na);
-            var type = archetype.Type;
-            if (!EntityTypes.HasKey(type))
-            {
-                EntityTypes.Add(type, archetype);
-            }
-        }
-
-        internal void InjectArchetypeWithout1(Type typeA, Type typeB, Type na)
-        {
-            InjectWithout1(na);
-            var archetype = NewEntityTypeWithout1(typeA, typeB, na, na);
-            var type = archetype.Type;
-            if (!EntityTypes.HasKey(type))
-            {
-                EntityTypes.Add(type, archetype);
-            }
-
-        }
-        internal void InjectArchetypeWithout1(Type typeA, Type typeB, Type typeC, Type na)
-        {
-            InjectWithout1(na);
-            var archetype = NewEntityTypeWithout1(typeA, typeB, typeC, na);
-            var type = archetype.Type;
-            if (!EntityTypes.HasKey(type))
-            {
-                EntityTypes.Add(type, archetype);
-            }
-        }
-        internal void InjectArchetypeWithout1(Type typeA, Type typeB, Type typeC, Type typeD, Type na)
-        {
-            InjectWithout1(na);
-            var archetype = NewEntityTypeWithout1(typeA, typeB, typeC, typeD, na);
-            var type = archetype.Type;
-            if (!EntityTypes.HasKey(type))
-            {
-                EntityTypes.Add(type, archetype);
-            }
-        }
-        internal void InjectArchetypeWithout1(Type typeA, Type typeB, Type typeC, Type typeD, Type typeE, Type na)
-        {
-            InjectWithout1(na);
-            var archetype = NewEntityTypeWithout1(typeA, typeB, typeC, typeD, typeE, na);
-            var type = archetype.Type;
-            if (!EntityTypes.HasKey(type))
-            {
-                EntityTypes.Add(type, archetype);
-            }
-        }
-        internal void InjectArchetypeWithout2(Type typeA, Type na, Type nb)
-        {
-            InjectWithout2(na, nb);
-            var archetype = NewEntityTypeWithout2(typeA, na, nb);
-            var type = archetype.Type;
-            if (!EntityTypes.HasKey(type))
-            {
-                EntityTypes.Add(type, archetype);
-            }
-        }
-
-        internal void InjectArchetypeWithout2(Type typeA, Type typeB, Type na, Type nb)
-        {
-            InjectWithout2(na, nb);
-            var archetype = NewEntityTypeWithout2(typeA, typeB, na, nb);
-            var type = archetype.Type;
-            if (!EntityTypes.HasKey(type))
-            {
-                EntityTypes.Add(type, archetype);
-            }
-
-        }
-        internal void InjectArchetypeWithout2(Type typeA, Type typeB, Type typeC, Type na, Type nb)
-        {
-            InjectWithout2(na, nb);
-            var archetype = NewEntityTypeWithout2(typeA, typeB, typeC, na, nb);
-            var type = archetype.Type;
-            if (!EntityTypes.HasKey(type))
-            {
-                EntityTypes.Add(type, archetype);
-            }
-        }
-        internal void InjectArchetypeWithout2(Type typeA, Type typeB, Type typeC, Type typeD, Type na, Type nb)
-        {
-            InjectWithout2(na, nb);
-            var archetype = NewArchetypeWithout2(typeA, typeB, typeC, typeD, na, nb);
-            var type = archetype.Type;
-            if (!EntityTypes.HasKey(type))
-            {
-                EntityTypes.Add(type, archetype);
-            }
-        }
-        internal void InjectArchetypeWithout2(Type typeA, Type typeB, Type typeC, Type typeD, Type typeE, Type na, Type nb)
-        {
-            InjectWithout2(na, nb);
-            var archetype = NewEntityTypeWithout2(typeA, typeB, typeC, typeD, typeE, na, nb);
-            var type = archetype.Type;
-            if (!EntityTypes.HasKey(type))
-            {
-                EntityTypes.Add(type, archetype);
-            }
-        }
         internal EntityType NewArchetype(Type a)
         {
-            var archetype = typeof(EntityType<>);
-            return (EntityType)Activator.CreateInstance(archetype.MakeGenericType(a), new object[] { world });
+            var entityType = typeof(EntityType<>);
+            return (EntityType)Activator.CreateInstance(entityType.MakeGenericType(a), new object[] { world });
         }
         internal EntityType NewEntityType(Type a, Type b)
         {
-            var archetype = typeof(EntityType<,>);
-            return (EntityType)Activator.CreateInstance(archetype.MakeGenericType(a, b), new object[] { world });
+            var entityType = typeof(EntityType<,>);
+            return (EntityType)Activator.CreateInstance(entityType.MakeGenericType(a, b), new object[] { world });
         }
         internal EntityType NewEntityType(Type a, Type b, Type c)
         {
-            var archetype = typeof(EntityType<,,>);
+            var entityType = typeof(EntityType<,,>);
 
-            return (EntityType)Activator.CreateInstance(archetype.MakeGenericType(a, b, c), new object[] { world });
+            return (EntityType)Activator.CreateInstance(entityType.MakeGenericType(a, b, c), new object[] { world });
         }
         internal EntityType NewEntityType(Type a, Type b, Type c, Type d)
         {
-            var archetype = typeof(EntityType<,,,>);
-            return (EntityType)Activator.CreateInstance(archetype.MakeGenericType(a, b, c, d), new object[] { world });
+            var entityType = typeof(EntityType<,,,>);
+            return (EntityType)Activator.CreateInstance(entityType.MakeGenericType(a, b, c, d), new object[] { world });
         }
         internal EntityType NewEntityType(Type a, Type b, Type c, Type d, Type e)
         {
-            var archetype = typeof(EntityType<,,,,>);
-            return (EntityType)Activator.CreateInstance(archetype.MakeGenericType(a, b, c, d, e), new object[] { world });
+            var entityType = typeof(EntityType<,,,,>);
+            return (EntityType)Activator.CreateInstance(entityType.MakeGenericType(a, b, c, d, e), new object[] { world });
         }
         internal EntityType NewEntityTypeWithout1(Type a, Type na)
         {
-            Console.WriteLine(a.Name + " " + na.Name);
             var without = typeof(EntityType<>.WithOut<>).MakeGenericType(a, na);
             return (EntityType)Activator.CreateInstance(without, new object[] { world });
         }
@@ -556,15 +406,22 @@ namespace Wargon.ezs
             var archetype = typeof(EntityType<,,,>.WithOut<,>).MakeGenericType(a, b, c, d, na, nb);
             return (EntityType)Activator.CreateInstance(archetype, new object[] { world });
         }
-        internal EntityType NewEntityTypeWithout1(Type a, Type b, Type c, Type d, Type e, Type na)
+        internal EntityType NewEntityTypeWithout1(Type a, Type b, Type c, Type d, Type e, Type na)  
         {
-            var archetype = typeof(EntityType<,,,,>.WithOut<>).MakeGenericType(a, b, c, d, d, na);
+            var archetype = typeof(EntityType<,,,,>.WithOut<>).MakeGenericType(a, b, c, d, e, na);
             return (EntityType)Activator.CreateInstance(archetype, new object[] { world });
         }
         internal EntityType NewEntityTypeWithout2(Type a, Type b, Type c, Type d, Type e, Type na, Type nb)
         {
             var archetype = typeof(EntityType<,,,,>.WithOut<,>).MakeGenericType(a, b, c, d, e, na, nb);
             return (EntityType)Activator.CreateInstance(archetype, new object[] { world });
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal EntityType GetEntityType(Type type)
+        {
+            if(!EntityTypes.HasKey(type))
+                EntityTypes.Add(type, (EntityType)Activator.CreateInstance(type,  new object[] { world }));
+            return EntityTypes.Get(type);
         }
     }
 }
