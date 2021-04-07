@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
-using UnityEngine;
 
 namespace Wargon.ezs
 {
@@ -229,7 +228,7 @@ namespace Wargon.ezs
 
     public static class ComponentTypeMap
     {
-        public static Dictionary<Type, int> TypeID = new Dictionary<Type, int>();
+        private static Dictionary<Type, int> TypeID = new Dictionary<Type, int>();
         public static World World;
         public static void Add(Type type, int id)
         {

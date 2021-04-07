@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
-using UnityEngine;
 
 namespace Wargon.ezs
 {
@@ -10,8 +9,7 @@ namespace Wargon.ezs
         public static int ComponentCachSize = 1024;
         public static int EntityCachSize = 1024;
         public static int PoolsCachSize = 128;
-        public static int EntityTypesCachSize = 128;
-        public static int EntityComponentCount = 16;
+        public static int EntityTypesCachSize = 256;
     }
     public class World
     {
@@ -19,7 +17,6 @@ namespace Wargon.ezs
         public readonly int EntityCachSize;
         public readonly int PoolsCachSize;
         public readonly int EntityTypesCachSize;
-        public readonly int EntityComponentCount;
         public Entity[] entities;
         private EntityData[] entityData;
         private GrowList<int> freeEntities;
@@ -42,7 +39,6 @@ namespace Wargon.ezs
             EntityCachSize = Configs.EntityCachSize;
             PoolsCachSize = Configs.PoolsCachSize;
             EntityTypesCachSize = Configs.EntityTypesCachSize;
-            EntityComponentCount = Configs.EntityComponentCount;
             usedComponentsCount = 0;
             ComponentPools = new IPool[PoolsCachSize];
             entityData = new EntityData[EntityCachSize];
@@ -297,9 +293,6 @@ namespace Wargon.ezs
             for (int i = 0, iMax = entityType.ExludeCount; i < iMax; i++)
                 if(data.componentTypes.Contains(entityType.ExcludeTypes[i]))
                     return false;
-                // for (var j = 0; j < data.componentsCount; j++)
-                //     if (entityType.ExcludeTypes[i] == data.componentTypes[j])
-                //         return false;
 
             for (int i = 0, iMax = entityType.IncludCount; i < iMax; i++)
             {
@@ -311,15 +304,6 @@ namespace Wargon.ezs
                         return true;
                     }
                 }
-                // for (var j = 0; j < data.componentsCount; j++)
-                // {
-                //     if (entityType.IncludTypes[i] != data.componentTypes[j]) continue;
-                //     solves++;
-                //     if (solves == entityType.IncludCount)
-                //     {
-                //         return true;
-                //     }
-                // }
             }
             return false;
         }
@@ -337,15 +321,6 @@ namespace Wargon.ezs
                         return true;
                     }
                 }
-                // for (var j = 0; j < data.componentsCount; j++)
-                // {
-                //     if (entityType.IncludTypes[i] != data.componentTypes[j]) continue;
-                //     solves++;
-                //     if (solves == entityType.IncludCount)
-                //     {
-                //         return true;
-                //     }
-                // }
             }
             return false;
         }

@@ -10,7 +10,7 @@ namespace Wargon.ezs
         {
             public EntitiesWithout(World world) : base(world)
             {
-                excludedTypes = new int[1] {
+                excludedTypes = new [] {
                     ComponentType<NA>.ID
                 };
             }
