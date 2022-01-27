@@ -1,9 +1,19 @@
-using System.Collections;
-using System.Collections.Generic;
+using System;
 using UnityEngine;
-using Wargon.ezs;
 
-public class WorldDebug : MonoBehaviour
+namespace Wargon.ezs.Unity
 {
-    public World world;
+    public class WorldDebug : MonoBehaviour
+    {
+        public World world;
+        private void LateUpdate()
+        {
+            DebugUpdate.Redraw?.Invoke();
+        }
+    }
+
+    public static class DebugUpdate
+    {
+        public static Action Redraw;
+    }
 }

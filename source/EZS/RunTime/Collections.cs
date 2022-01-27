@@ -3,41 +3,42 @@ using System.Collections.Generic;
 using System.Linq.Expressions;
 using System.Runtime.CompilerServices;
 using System.Threading;
+using Unity.Burst;
 
 namespace Wargon.ezs
 {
-    public static class Creator
+    public interface ICustomPool
     {
-        public static T New<T>() where T : new()
-        {
-            return new T();
-        }
+        int PoolType { get; set; }
+
+        void Clear();
     }
+    
     [Serializable]
     public class Pool<T> : IPool
     {
         public T[] items;
         public int length;
-        public int TypeID;
-        private int[] cachedSize;
+
         public Pool(int size)
         {
             items = new T[size];
-            ItemType = ComponentType<T>.Value;
+            ItemType = typeof(T);
             TypeID = ComponentType<T>.ID;
             length = size;
         }
 
+        public int TypeID { get; }
         public Type ItemType { get; }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Remove(Entity entity)
+        public void Remove(int entity)
         {
             OnRemove?.Invoke(entity);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Add(Entity entity)
+        public void Add(int entity)
         {
             OnAdd?.Invoke(entity);
         }
@@ -47,9 +48,6 @@ namespace Wargon.ezs
         {
             if (length - 1 < id)
             {
-                // var dif = length > id ? length - id : id - length;
-                // Array.Resize(ref items, 1 + length + dif);
-                // length = items.Length;
                 Array.Resize(ref items, id + 256);
                 length = items.Length;
             }
@@ -62,9 +60,6 @@ namespace Wargon.ezs
         {
             if (length - 1 < id)
             {
-                // var dif = length > id ? length - id : id - length;
-                // Array.Resize(ref items, 1 + length + dif);
-                // length = items.Length;
                 Array.Resize(ref items, id + 256);
                 length = items.Length;
             }
@@ -89,12 +84,11 @@ namespace Wargon.ezs
                 Array.Resize(ref items, id + 256);
                 length = items.Length;
             }
-
-            items[id] = (T) component;
+            items[id] = (T)component;
         }
 
-        public event Action<Entity> OnRemove;
-        public event Action<Entity> OnAdd;
+        public event Action<int> OnRemove;
+        public event Action<int> OnAdd;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Set(T component, int id)
@@ -139,6 +133,7 @@ namespace Wargon.ezs
 
     public interface IPool
     {
+        int TypeID { get; }
         Type ItemType { get; }
 
         /// <summary>
@@ -161,8 +156,8 @@ namespace Wargon.ezs
         /// </summary>
         void Set(int id);
 
-        void Add(Entity entity);
-        void Remove(Entity entity);
+        void Add(int entity);
+        void Remove(int entity);
         int GetSize();
     }
 
@@ -270,40 +265,62 @@ namespace Wargon.ezs
         }
     }
 
+
     public static class ComponentType<T>
     {
-        public static int ID;
-        public static Type Value;
+        public readonly static int ID;
 
         static ComponentType()
         {
-            Value = typeof(T);
+            var Value = typeof(T);
             if (ComponentTypeMap.Has(Value))
             {
                 ID = ComponentTypeMap.GetID(Value);
-                return;
+            }
+            else
+            {
+                ID = Interlocked.Increment(ref ComponentTypes.Count);
+                ComponentTypeMap.Add<T>(Value, ID);
             }
 
-            ID = Interlocked.Increment(ref ComponentTypes.Count);
-            ComponentTypeMap.Add(Value, ID);
+            if(Value.IsUnmanaged())
+                ComponentTypeStruct<T>.SetID(ID);
+
         }
     }
-
+    public struct ComponentTypeStruct<T>
+    {
+        private readonly static SharedStatic<int> typeID;
+        public static int ID
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get => typeID.Data;
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void SetID(int ids) => typeID.Data = ids;
+        static ComponentTypeStruct()
+        {
+            typeID = SharedStatic<int>.GetOrCreate<ComponentTypeStruct<T>>();
+        }
+    }
     public static class ComponentTypes
     {
         internal static int Count;
     }
 
-    public static class type<T>
+    internal static class CustomPoolsCount
     {
-        public static readonly Type Value;
-
-        static type()
+        public static int Value;
+    }
+    internal static class CustomPoolID<T>
+    {
+        public static int Value;
+        static CustomPoolID()
         {
-            Value = typeof(T);
+            Value = CustomPoolsCount.Value++;
         }
     }
-
+    
     public static class ComponentTypeMap
     {
         private static Dictionary<Type, int> TypeID;
@@ -321,7 +338,7 @@ namespace Wargon.ezs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void Add(Type type, int id)
+        public static void Add<A>(Type type, int id)
         {
             if (TypeID.ContainsKey(type)) return;
             TypeID.Add(type, id);
@@ -348,10 +365,13 @@ namespace Wargon.ezs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static Type GetValue(int id)
+        public static Type GetTypeByID(int id)
         {
             return TypeValue[id];
         }
+        
+        
+        
     }
 
     public static class Component<T>
@@ -368,7 +388,44 @@ namespace Wargon.ezs
             return fastActivator();
         }
     }
+    internal static class TypePair<T1, T2>
+    { 
+        internal static int Id;
+        static TypePair()
+        {
+            Id = Counts<T1>.Value++;
+        }
+    }
 
+    internal static class Counts<T1>
+    {
+        internal static int Value;
+    }
+    
+    public static class CollectionHelp
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void ValidateEntityTypes(ref EntityType[] array, ref bool[] actives, int id)
+        {
+            if (array.Length == id - 1)
+            {
+                var newL = array.Length + 256;
+                Array.Resize(ref array, newL);
+                Array.Resize(ref actives, newL);
+            }
+        }
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void ValidateEntities(ref Entities[] array, ref bool[] actives, int id)
+        {
+            if (array.Length == id - 1)
+            {
+                var newL = array.Length + 256;
+                Array.Resize(ref array, newL);
+                Array.Resize(ref actives, newL);
+            }
+        }
+    }
     public static class FastActivator
     {
         public static Func<TResult> Generate<TResult>()

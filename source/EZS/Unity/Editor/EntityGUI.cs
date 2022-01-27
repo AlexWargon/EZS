@@ -12,13 +12,13 @@ namespace Wargon.ezs.Unity
         private static bool colored = true;
         private static readonly Color Default = new Color(0.6f, 0.6f, 0.6f, 0.18f);
 
-        [MenuItem("Entity/Colored On|Off")]
+        [MenuItem("EZS/Colored On|Off")]
         private static void SetColored()
         {
             colored = !colored;
         }
 
-        public static void Init()
+        static EntityGUI()
         {
             colorBoxes = new Dictionary<int, GUIStyle[]>();
             newColorBoxes = new Dictionary<Type, GUIStyle>();
@@ -40,22 +40,24 @@ namespace Wargon.ezs.Unity
 
         public static GUIStyle GetColorStyle(Type type)
         {
-            if (newColorBoxes == null) newColorBoxes = new Dictionary<Type, GUIStyle>();
+            newColorBoxes ??= new Dictionary<Type, GUIStyle>();
 
             if (ComponentTypesList.Count != newColorBoxes.Count || !newColorBoxes.ContainsKey(type))
             {
-                var types = ComponentTypesList.GetTypeValues();
+                var types = ComponentTypesList.GetTypes();
                 newColorBoxes.Clear();
                 for (int i = 0, iMax = ComponentTypesList.Count; i < iMax; i++)
                 {
                     var newType = types[i];
                     var componentColor = ComponentTypesList.GetColorStyle(newType);
                     componentColor.a = 0.15f;
-                    var style = new GUIStyle(GUI.skin.box);
-                    style.normal.background = NewTexture(2, 2, componentColor);
+                    var style = new GUIStyle(GUI.skin.box) {normal = {background = NewTexture(2, 2, componentColor)}};
                     newColorBoxes.Add(types[i], style);
                 }
             }
+            if(newColorBoxes.ContainsKey(type))
+                return newColorBoxes[type];
+            newColorBoxes.Add(type, new GUIStyle(GUI.skin.box));
             return newColorBoxes[type];
         }
         private static void SetComponentColor(int componentsCount, GUIStyle[] styles)

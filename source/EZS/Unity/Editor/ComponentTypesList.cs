@@ -20,26 +20,41 @@ using UnityEditor;
         public static string[] GetAllInArray() => TypesArray;
         public static Color GetColorStyle(Type type) => Colors[type];
 
-        public static Type[] GetTypeValues()
+        public static Type[] GetTypes()
         {
-            if (typesValue == null)
+            if(typesValue.Length < 1)
                 Init();
             return typesValue;
         }
         public static bool IsNUll => !inited;
         private static bool inited;
-        public static void Init() {
-            var assembly = Assembly.GetAssembly(typeof(EcsComponentAttribute));
-            typesValue = GetTypesWithAttribute(typeof(EcsComponentAttribute), assembly).ToArray();
-            Array.Sort(typesValue, (x,y) => String.Compare(x.Name, y.Name, StringComparison.Ordinal));
-            foreach (var type in typesValue)
-                Add($"{type}");
+
+        static ComponentTypesList()
+        {
+            Init();
+        }
+        public static void Init()
+        {
+            var assemblies = AppDomain.CurrentDomain.GetAssemblies();
+            var listOfComponents = new List<Type>();
+            foreach (var assembly in assemblies)
+            {
+                var componentsFromAssebly = GetTypesWithAttribute(typeof(EcsComponentAttribute), assembly).ToArray();
+                Array.Sort(componentsFromAssebly, (x,y) => String.Compare(x.Name, y.Name, StringComparison.Ordinal));
+                foreach (var type in componentsFromAssebly)
+                {
+                    listOfComponents.Add(type);
+                    Add($"{type}");
+                }
+            }
+
+            typesValue = listOfComponents.ToArray();
+            listOfComponents.Clear();
             Types.Sort();
             TypesArray = Types.ToArray();
             SetColorStyles(typesValue);
             inited = true;
         }
-
 
         private static void SetColorStyles(Type[] types)
         {

@@ -21,7 +21,6 @@ namespace Wargon.ezs.Unity
 
         private static void DrawInspector()
         {
-            if (Entity == null) return;
             if (Entity.IsDead())
             {
                 GUILayout.Label("ENTITY DEAD ");
@@ -71,8 +70,6 @@ namespace Wargon.ezs.Unity
                 if (component != null)
                     name += $"; {component.GetType()}";
             }
-
-            //return $"Entity{entity.id.ToString()}:{entity.generation.ToString()}";
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

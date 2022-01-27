@@ -1,7 +1,4 @@
-﻿using System.Linq;
-using UnityEngine;
-
-namespace Wargon.ezs
+﻿namespace Wargon.ezs
 {
     using System;
     using System.Collections.Generic;
@@ -14,8 +11,32 @@ namespace Wargon.ezs
         public static int EntityTypesCacheSize = 64;
     }
 
+    public static class Worlds
+    {
+        private static World[] WorldsPool;
+        private static int WorldsCount;
+
+        static Worlds()
+        {
+            WorldsPool = new World[4];
+            WorldsCount = 0;
+        }
+        public static World New()
+        {
+            var world = new World();
+            WorldsPool[WorldsCount] = world;
+            world.ID = WorldsCount;
+            WorldsCount++;
+            return world;
+        }
+        public static World GetWorld(int id)
+        {
+            return WorldsPool[id];
+        }
+    }
     public class World
     {
+        public int ID;
         public readonly int ComponentCacheSize;
         public readonly int EntityCacheSize;
         public readonly int PoolsCacheSize;
@@ -30,7 +51,9 @@ namespace Wargon.ezs
         private TypeMap<int, Systems> systems;
         private int systemsCount;
         private int freeEntitiesCount = 0;
+        private int customPoolsCount;
         private event Action OnDestroy;
+        private ICustomPool[] customPools;
         public int GetFreeEntitiesCount() => freeEntities.Count;
         public World()
         {
@@ -39,6 +62,7 @@ namespace Wargon.ezs
             PoolsCacheSize = Configs.PoolsCacheSize;
             EntityTypesCachSize = Configs.EntityTypesCacheSize;
             ComponentPools = new IPool[PoolsCacheSize];
+            customPools = new ICustomPool[PoolsCacheSize];
             entitiesData = new EntityData[EntityCacheSize];
             entities = new Entity[EntityCacheSize];
             freeEntities = new GrowList<int>(EntityCacheSize);
@@ -48,7 +72,7 @@ namespace Wargon.ezs
             ComponentTypeMap.Init(this);
             Alive = true;
         }
-
+        
         public void AddSystems(Systems add)
         {
             add.id = systemsCount;
@@ -73,6 +97,10 @@ namespace Wargon.ezs
             Array.Clear(entitiesData, 0, entitiesCount);
             Array.Clear(freeEntities.Items, 0, freeEntitiesCount);
             Array.Clear(ComponentPools, 0, ComponentPools.Length);
+            for (var i = 0; i < customPoolsCount; i++)
+            {
+                customPools[i].Clear();
+            }
             Entities.Clear();
             systems.Clear();
             entitiesCount = 0;
@@ -98,8 +126,6 @@ namespace Wargon.ezs
             {
                 if (entitiesData.Length == entitiesCount)
                 {
-                    // Array.Resize(ref entities, entities.Length << 1);
-                    // Array.Resize(ref entitiesData, entitiesData.Length << 1);
                     Array.Resize(ref entities, entities.Length + 256);
                     Array.Resize(ref entitiesData, entitiesData.Length + 256);
                 }
@@ -126,20 +152,26 @@ namespace Wargon.ezs
             }
             return entity;
         }
-        
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal void OnDestroyEntity(in Entity entity)
         {
-            for (var index = 0; index < Entities.EntityTypes.Count; index++)
-                Entities.EntityTypes.Values.Items[index].Remove(entity);
-            for (var index = 0; index < Entities.Withouts.Count; index++)
+            for (var index = 0; index < Entities.entityTypesCount; index++)
             {
-                var withOut = Entities.Withouts.Values.Items[index];
-                for (var i = 0; i < withOut.EntityTypes.Values.Count; i++)
-                    withOut.EntityTypes.Values.Items[i].Remove(entity);
+                if(Entities.entityTypesActives[index])
+                    Entities.entityTypesArray[index].Remove(entity);
+            }
+            
+            for (var index = 0; index < Entities.withoutsCount; index++)
+            {
+                var withOut = Entities.entitiesWithoutArray[index];
+                for (var i = 0; i < withOut.entityTypesCount; i++)
+                {
+                    if(withOut.entityTypesActives[i])
+                        withOut.entityTypesArray[i].Remove(entity);
+                }
             }
             freeEntities.Add(entity.id);
-            //entitiesCount--;
         }
         
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -168,7 +200,20 @@ namespace Wargon.ezs
             }
             return pool;
         }
-
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public T GetCustomPool<T>() where T : ICustomPool
+        {
+            var typeIdx = CustomPoolID<T>.Value;
+            var pool = customPools[typeIdx];
+            return (T)pool;
+        }
+        public World AddCustomPool<T>(T pool) where T : ICustomPool
+        {
+            pool.PoolType = CustomPoolID<T>.Value;
+            customPoolsCount = pool.PoolType;
+            customPools[customPoolsCount] = pool;
+            return this;
+        }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public Entity GetEntity(int id)
         {
@@ -197,18 +242,18 @@ namespace Wargon.ezs
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal void OnDeActivateEntity(in Entity entity, EntityData data)
         {
-            for (int index = 0, iMax = Entities.EntityTypes.Values.Count; index < iMax; index++)
+            for (int index = 0, iMax = Entities.entityTypesCount; index < iMax; index++)
             {
-                var entityType = Entities.EntityTypes.Values[index];
+                var entityType = Entities.entityTypesArray[index];
                     entityType.Remove(entity);
             }
             
-            for (int index = 0, indexMax = Entities.Withouts.Values.Count; index < indexMax; index++)
+            for (int index = 0, indexMax = Entities.withoutsCount; index < indexMax; index++)
             {
-                var withOut = Entities.Withouts.Values[index];
-                for (int i = 0, iMax = withOut.EntityTypes.Values.Count; i < iMax; i++)
+                var withOut = Entities.entitiesWithoutArray[index];
+                for (int i = 0, iMax = withOut.entityTypesCount; i < iMax; i++)
                 {
-                    var entityType = withOut.EntityTypes.Values.Items[i];
+                    var entityType = withOut.entityTypesArray[i];
                     entityType.Remove(entity);
                 }
             }
@@ -216,19 +261,19 @@ namespace Wargon.ezs
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal void OnActivateEntity(in Entity entity, EntityData data)
         {
-            for (int index = 0, iMax = Entities.EntityTypes.Values.Count; index < iMax; index++)
+            for (int index = 0, iMax = Entities.entityTypesCount; index < iMax; index++)
             {
-                var entityType = Entities.EntityTypes.Values[index];
+                var entityType = Entities.entityTypesArray[index];
                 if (IsCompileByInclude(entityType, data))
                     entityType.Add(entity);
             }
 
-            for (int index = 0, iMax = Entities.Withouts.Values.Count; index < iMax; index++)
+            for (int index = 0, iMax = Entities.withoutsCount; index < iMax; index++)
             {
-                var withOut = Entities.Withouts.Values[index];
-                for (var i = 0; i < withOut.EntityTypes.Values.Count; i++)
+                var withOut = Entities.entitiesWithoutArray[index];
+                for (var i = 0; i < withOut.entityTypesCount; i++)
                 {
-                    var entityType = withOut.EntityTypes.Values.Items[i];
+                    var entityType = withOut.entityTypesArray[i];
                     if (IsCompile(entityType, data))
                         entityType.Add(entity);
                 }

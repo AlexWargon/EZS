@@ -4,91 +4,104 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using UnityEngine.UIElements;
+using Object = System.Object;
+using PopupWindow = UnityEditor.PopupWindow;
 
 namespace Wargon.ezs.Unity {
 
     [CustomEditor(typeof(MonoEntity), true), CanEditMultipleObjects]
     public class MonoEntityEditor : Editor 
     {
-        private MonoEntity entity;
+        private MonoEntity monoEntity;
+        private MonoEntity[] manyEntities = new MonoEntity[16];
         private bool flowed = true;
         private GUIContent addComponentText;
         private GUIStyle addComponentButtonStyle;
         private Rect addButtonRect;
-        private void Awake() 
-        {
-            EntityGUI.Init();
-            ComponentTypesList.Init();
-        }
+        //private bool editMany;
+        private int entitiesCount;
         
-        public override void OnInspectorGUI() 
+
+        public override bool RequiresConstantRepaint()
         {
-            //DrawDefaultInspector();
-            entity = (MonoEntity)target;
+            return monoEntity.runTime || base.RequiresConstantRepaint();
+        }
+
+        public override void OnInspectorGUI()
+        {
+            //editMany = targets.Length > 1;
+            entitiesCount = targets.Length;
+            for (var i = 0; i < entitiesCount; i++)
+            {
+                manyEntities[i] = (MonoEntity) targets[i];
+            }
+            monoEntity = (MonoEntity) targets[0];
+            
+            
+            EditorGUI.BeginChangeCheck();
             addComponentText = new GUIContent("Add Component");
             addComponentButtonStyle = GUI.skin.button;
-            EditorGUI.BeginChangeCheck();
 
-            if (entity.runTime)
+            if (monoEntity.runTime)
             {
                 EditorGUILayout.BeginHorizontal();
                 EditorGUILayout.Space();
                 if (GUILayout.Button(new GUIContent("Kill Entity"),GUILayout.Width(154), GUILayout.Height(24)))
-                    entity.Entity.Destroy();
+                    monoEntity.Entity.Destroy();
                 EditorGUILayout.Space();
                 EditorGUILayout.EndHorizontal();
             }
             else
             {
                 EditorGUILayout.BeginHorizontal();
-                entity.destroyComponent = EditorGUILayout.Toggle("Destroy MonoBeh", entity.destroyComponent);
-                entity.destroyObject = EditorGUILayout.Toggle("Destroy GO", entity.destroyObject);
+                monoEntity.destroyComponent = EditorGUILayout.Toggle("Destroy MonoBeh", monoEntity.destroyComponent);
+                monoEntity.destroyObject = EditorGUILayout.Toggle("Destroy GO", monoEntity.destroyObject);
                 EditorGUILayout.EndHorizontal();
             }
 
             EditorGUILayout.BeginHorizontal();
-            EditorGUILayout.LabelField("Run Time", entity.runTime ? "✔" : "✘", EditorStyles.largeLabel);
-            EditorGUILayout.LabelField(entity.runTime ? $"ID:{entity.Entity.id.ToString()}" : "ID:X");
+            EditorGUILayout.LabelField("Run Time", monoEntity.runTime ? "✔" : "✘", EditorStyles.largeLabel);
+            EditorGUILayout.LabelField(monoEntity.runTime ? $"ID:{monoEntity.Entity.id.ToString()}" : "ID:X");
             EditorGUILayout.EndHorizontal();
             
             
             EntityGUI.Vertical(GUI.skin.box, () =>
             {
-                if (entity.runTime)
-                    if (entity.Entity.IsDead())
+                if (monoEntity.runTime)
+                {
+                    if (monoEntity.Entity.IsDead())
                     {
                         EditorGUILayout.LabelField("ENTITY DEAD", EditorStyles.whiteLargeLabel);
                         return;
                     }
+                }
+                
                 EntityGUI.Horizontal(() =>
                 {
-                    flowed = EditorGUILayout.Foldout(flowed, $"ECS Components [{entity.ComponentsCount.ToString()}]");
+                    flowed = EditorGUILayout.Foldout(flowed, $"ECS Components [{monoEntity.ComponentsCount.ToString()}]");
                     
                     if (GUILayout.Button(new GUIContent("Clear", "Remove All Components")))
                         RemoveAll();
                 });
-
-                if (flowed)
+                
+                if (!flowed) return;
+                addButtonRect = GUILayoutUtility.GetRect(addComponentText, addComponentButtonStyle);
+                if (GUI.Button(addButtonRect, addComponentText, addComponentButtonStyle))
                 {
-                    addButtonRect = GUILayoutUtility.GetRect(addComponentText, addComponentButtonStyle);
-                    if (GUI.Button(addButtonRect, addComponentText, addComponentButtonStyle))
-                    {
-                        addButtonRect.y -= 20f;
-                        PopupWindow.Show(addButtonRect, new ComponentSearchPopup(AddComponent));
-                    }
-                    
-                    DrawComponents();
+                    addButtonRect.y -= 20f;
+                    PopupWindow.Show(addButtonRect, new ComponentSearchPopup(AddComponent, manyEntities, entitiesCount));
                 }
-
-
+                DrawComponents();
             });
-            EditorGUILayout.LabelField($"EZS", EditorStyles.whiteMiniLabel);
-
+            EditorGUILayout.LabelField("EZS", EditorStyles.whiteMiniLabel);
             if (EditorGUI.EndChangeCheck())
                 EditorUtility.SetDirty(target);
+                
         }
 
-        private object NewObject(Type type) {
+        
+        private static object NewObject(Type type) {
             return Activator.CreateInstance(type);
         }
 
@@ -102,17 +115,18 @@ namespace Wargon.ezs.Unity {
         }
 
         private void RemoveAll() {
-            entity.Components.Clear();
+            monoEntity.Components.Clear();
         }
 
-        private void AddComponent(string componentName) {
+        private void AddComponent(string componentName, MonoEntity entity) {
             if (entity.runTime)
-                AddComponentRuntime(componentName);
+                AddComponentRuntime(componentName,entity);
             else
-                AddComponentEditor(componentName);
+                AddComponentEditor(componentName,entity);
+            EditorUtility.SetDirty(entity);
         }
         
-        private void AddComponentEditor(string componentName)
+        private void AddComponentEditor(string componentName, MonoEntity entity)
         {
             var type = GetComponentType(componentName);
             if (entity.Components.HasType(type)) {
@@ -120,10 +134,11 @@ namespace Wargon.ezs.Unity {
             }
 
             var resolver = NewObject(type);
+            //Debug.Log(resolver.GetType());
             entity.Components.Add(resolver);
         }
         
-        private void AddComponentRuntime(string componentName)
+        private void AddComponentRuntime(string componentName, MonoEntity entity)
         {
             var type = GetComponentType(componentName);
             if (entity.Entity.GetEntityData().componentTypes.Contains(ComponentTypeMap.GetID(type))) {
@@ -134,11 +149,12 @@ namespace Wargon.ezs.Unity {
             var component= NewObject(type);
             entity.Entity.AddBoxed(component);
             entity.Components.Add(component);
+            EditorUtility.SetDirty(entity);
         }
 
         private void DrawComponents() {
-            for (var index = 0; index < entity.ComponentsCount; index++)
-                ComponentInspector.DrawComponentBox(entity, index);
+            for (var index = 0; index < monoEntity.ComponentsCount; index++)
+                ComponentInspector.DrawComponentBox(monoEntity, index, manyEntities, entitiesCount);
         }
     }
     public static class StringExtensions
@@ -146,6 +162,21 @@ namespace Wargon.ezs.Unity {
         public static bool Contains(this string source, string toCheck, StringComparison comp)
         {
             return source?.IndexOf(toCheck, comp) >= 0;
+        }
+    }
+    public static class ListExtension
+    {
+        public static bool HasType(this System.Collections.IList list, Type whatHas)
+        {
+            var i = 0;
+            var count = list.Count;
+            for (i = 0; i < count; i++)
+            {
+                if (list[i] == null) return false;
+                if (list[i].GetType() == whatHas)
+                    return true;
+            }
+            return false;
         }
     }
 }

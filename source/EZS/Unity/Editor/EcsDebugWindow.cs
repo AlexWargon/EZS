@@ -27,8 +27,6 @@ namespace Wargon.ezs.Unity
 
         private void OnGUI()
         {
-            if (ComponentTypesList.Count < 1)
-                ComponentTypesList.Init();
             var world = MonoConverter.GetWorld();
             if (world == null)
             {

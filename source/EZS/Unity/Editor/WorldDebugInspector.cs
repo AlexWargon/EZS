@@ -1,13 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
+
 using UnityEditor;
 using UnityEditor.IMGUI.Controls;
 using UnityEngine;
 using UnityEngine.Profiling;
-using Wargon.ezs.Unity;
 
-namespace Wargon.ezs
+namespace Wargon.ezs.Unity
 {
     [CustomEditor(typeof(WorldDebug))]
     public class WorldDebugInspector : Editor
@@ -21,13 +21,15 @@ namespace Wargon.ezs
             filterComponentsField = new SearchField();
             filterComponentsField.SetFocus();
             filterComponentString = string.Empty;
-            ComponentTypesList.Init();
-            EntityGUI.Init();
+        }
+
+        public override bool RequiresConstantRepaint()
+        {
+            return true;
         }
 
         public override void OnInspectorGUI()
         {
-            base.DrawDefaultInspector();
             var debug = target as WorldDebug;
             var world = debug.world;
 
@@ -72,7 +74,7 @@ namespace Wargon.ezs
             for (var i = 0; i < pools.Length; i++)
             {
                 if(pools[i]!=null)
-                    EditorGUILayout.LabelField($" Pool<{pools[i].ItemType}> Size : {pools[i].GetSize()}");
+                    EditorGUILayout.LabelField($" Pool<{ComponentTypeMap.GetTypeByID(pools[i].TypeID).Name}> Size : {pools[i].GetSize()}");
             }
         }
     }
@@ -116,7 +118,7 @@ namespace Wargon.ezs
             return filter == string.Empty || name.Contains(filter, StringComparison.OrdinalIgnoreCase);
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public  void Draw(Entity entity, string filter)
+        public void Draw(Entity entity, string filter)
         {
             if(!Has(filter)) return;
             if (name == String.Empty)
@@ -148,7 +150,6 @@ namespace Wargon.ezs
 
     public static class FloatToString
     {
-
         private const   string      floatFormat         = "0.0";
         private static  float       decimalMultiplier   = 1f;
         private static  string[]    negativeBuffer      = new string[0];

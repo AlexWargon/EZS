@@ -10,7 +10,6 @@ namespace Wargon.ezs.Unity {
         public Entity Entity;
         private World world;
         [SerializeReference]
-        [HideInInspector] 
         public List<object> Components = new List<object>();
         public int ComponentsCount => runTime ? Entity.GetEntityData().componentTypes.Count : Components.Count;
         public bool runTime;
@@ -55,7 +54,8 @@ namespace Wargon.ezs.Unity {
             if(!destroyObject)
                 if(world!= null)
                     if(world.Alive)
-                        Entity.Destroy();
+                        if(!Entity.IsDead())
+                            Entity.Destroy();
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void SetActive(bool state)
@@ -108,6 +108,6 @@ namespace Wargon.ezs.Unity {
         public MonoEntity Value;
     }
     [EcsComponent] 
-    public struct UnActive { }
+    public class UnActive { }
 }
 
