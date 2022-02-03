@@ -70,13 +70,15 @@ entity.IsDead();
 entity.Destroy();
 ```
 # Components:
-Components are just structs with public fields
+Components are just structs or classes with public fields
 Examples:
 ```C#
+[EcsComponent] // visual debugging and atachment components to entity from inspector
 public struct Health 
 { 
     public int value;
 }
+[EcsComponent]
 public struct TransformRef
 {
     public Transform value;
