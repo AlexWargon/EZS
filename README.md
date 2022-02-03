@@ -74,10 +74,12 @@ entity.Destroy();
 Components are just structs with public fields
 Examples:
 ```C#
+[EcsComponent] // attribute for visual debugging and atachment components to entity from inspector
 public struct Health 
 { 
     public int value;
 }
+[EcsComponent]
 public struct TransformRef
 {
     public Transform value;
