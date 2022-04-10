@@ -79,7 +79,7 @@ public struct Health
     public int value;
 }
 [EcsComponent]
-public struct TransformRef
+public class TransformRef
 {
     public Transform value;
 }
