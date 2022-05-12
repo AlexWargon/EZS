@@ -71,7 +71,7 @@ entity.IsDead();
 entity.Destroy();
 ```
 # Components:
-Components are just structs with public fields
+Components are just structs or class with public fields
 Examples:
 ```C#
 [EcsComponent] // attribute for visual debugging and atachment components to entity from inspector
@@ -80,7 +80,7 @@ public struct Health
     public int value;
 }
 [EcsComponent]
-public struct TransformRef
+public class TransformRef
 {
     public Transform value;
 }
@@ -179,6 +179,7 @@ public class MultyThreadExampleUpdateSystem  : UpdateSystem
 {
     public override void Update() 
     {
+        //ref keyword if you use struct as component
         entities.EachThreaded((ref Position pos, ref RayCast ray, ref Impact impact, ref CanReflect reflect, ref BossTag tag) => 
         {
             //some logic
@@ -193,11 +194,13 @@ public class WithoutSystemExample  : UpdateSystem
 {
     public override void Update() 
     {
+        //ref keyword if you use struct as component
         entities.Without<UnActive, PlayerTag>().EachThreaded((ref Position pos, ref RayCast ray, ref Impact impact, ref CanReflect reflect, ref BossTag tag) => 
         {
             //some logic
         });
-        entities.Without<UnActive, PlayerTag>().Each((ref Rigidbody rb, ref BoxCollider box) => 
+        //ref keyword if you use struct as component
+        entities.Without<UnActive, PlayerTag>().Each((Rigidbody rb, ref BoxCollider box) => 
         {
             //some logic
         });
