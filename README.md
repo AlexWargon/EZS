@@ -107,7 +107,7 @@ public class UpdateExampleSystem : UpdateSystem
 //Call system when component added to some entity
 public class DamageSystem : OnAdd<Damaged> 
 {
-    public override void Execute() 
+    public override void Execute(in Enitity entity) 
     {
         //some logic
     }
@@ -117,7 +117,7 @@ public class DamageSystem : OnAdd<Damaged>
 //Call system when component removed from some entity
 public class OnRemoveSystem : OnRemove<SomeComponent> 
 {
-    public override void Execute() 
+    public override void Execute(in Enitity entity) 
     {
         //some logic
     }
@@ -131,7 +131,7 @@ public class InitExampleSystem : InitSystem
 {
     public override void Execute() 
     {
-        entities.Each((ref Health heath, ref Damaged damage) => 
+        entities.Each((Entity entity, ref Health heath, ref Damaged damage) => 
         {
             //some logic
         });
@@ -172,7 +172,7 @@ public class SingleThreadExampleUpdateSystem : UpdateSystem
 ```
 2. entities.EachThreaded((..........)=>{.....});
 ```C#
-//same think like entities.Each(()=>), but use all threads of CPU!!!
+//same think like entities.Each(()=>), but use all threads of CPU.
 //p.s. it won't work with unity object types like Transform, GameObject, Rigidbody and others :C
 
 public class MultyThreadExampleUpdateSystem  : UpdateSystem 
@@ -188,7 +188,7 @@ public class MultyThreadExampleUpdateSystem  : UpdateSystem
 }
 
 ```
-3. You can filter entities not only by including components, but also by exluding
+3. You can filter entities not only by including components, but also by excluding
 ```C#
 public class WithoutSystemExample  : UpdateSystem 
 {
