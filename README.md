@@ -207,3 +207,13 @@ public class WithoutSystemExample  : UpdateSystem
     }
 }
 ```
+
+# Unity Integration:
+Entity Wrapper
+
+![image](https://user-images.githubusercontent.com/37613162/168055056-b42cb0d8-a9f5-44e6-bb6d-2f351bdd117c.png)
+
+Systems
+
+![image](https://user-images.githubusercontent.com/37613162/168055250-086ee037-642e-4c0f-a366-2218aeacb189.png)
+
