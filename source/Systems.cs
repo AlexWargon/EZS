@@ -36,35 +36,43 @@ namespace Wargon.ezs
             systemBigListener = listener;
             debugMode = systemBigListener != null;
         }
-
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public Systems Add(UpdateSystem system)
         {
             updateSystemsList.Add(system);
             system.Init(world.Entities, world);
-            InjectEntityTypesToSystem(system);
             system.Update();
             updateSystemsCount++;
             return this;
         }
-
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public Systems Add(InitSystem system)
         {
             initSystemsList.Add(system);
             system.Init(world.Entities, world);
             return this;
         }
-
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public Systems Add(DestroySystem system)
         {
             destroySystemsList.Add(system);
             system.Init(world.Entities, world);
             return this;
         }
-
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public Systems Add(SystemsGroup systemsGroup)
+        {
+            var systems = systemsGroup.GetSystems();
+            for (var i = 0; i < systemsGroup.Count; i++)
+            {
+                Add(systems.Items[i]);
+            }
+            return this;
+        }
+        
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public Systems AddReactive(IReactive system)
         {
-            InjectEntityTypesToSystem(system);
             if (system is IOnAdd add)
             {
                 var triggerType = add.TriggerType;
@@ -144,19 +152,33 @@ namespace Wargon.ezs
                     updateSystemsList.Items[i].Update();
             }
         }
-
-        private void InjectEntityTypesToSystem(object system)
-        {
-            var systemType = system.GetType();
-            var entityType = typeof(EntityType);
-            var fields = systemType.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-            foreach (var f in fields)
-                if (f.FieldType.IsSubclassOf(entityType))
-                    f.SetValue(system, world.Entities.GetEntityType(f.FieldType));
-            
-        }
     }
 
+    public class SystemsGroup
+    {
+        private GrowList<UpdateSystem> systems = new GrowList<UpdateSystem>(4);
+        internal int Count;
+        private string name;
+        
+        public SystemsGroup()
+        {
+            
+        }
+        public SystemsGroup(string name)
+        {
+            this.name = name;
+        }
+        public SystemsGroup Add(UpdateSystem system)
+        {
+            systems.Add(system);
+            Count++;
+            return this;
+        }
+
+        public GrowList<UpdateSystem> GetSystems() => systems;
+        public string GetName() => name;
+    }
+    
     internal interface IOnAdd : IReactive
     {
         void Execute();

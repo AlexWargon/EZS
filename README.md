@@ -15,6 +15,7 @@ Just copy source folder in assets folder of your game
 Init World and Systems
 ```C#
 var world = new World();
+MonoConverter.Init(world); // Turn on unity integration
 var systems = new Systems(world);
 systems .Add(new PlayerMoveSystem())  //Add update/init/destroy system
         .AddReactive(new HealSystem())  //Add reactive system
@@ -23,7 +24,7 @@ systems .Add(new PlayerMoveSystem())  //Add update/init/destroy system
 //You can use multiple Systems objects with one world
 var systemsFixed = new Systems(world);
 var systemsLate = new Systems(world);
-
+var debug = new DebugInfo(world); // Turn on debug
 systems.Init();
 systemsFixed.Init();
 systemsLate.Init();
