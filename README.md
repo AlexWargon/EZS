@@ -1,3 +1,5 @@
+Actual version https://github.com/AlexWargon/EZS/tree/beta-0.5
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ![EZS_LOGO_22](https://user-images.githubusercontent.com/37613162/113684924-62cd8e80-96ce-11eb-8069-6923d4972dd1.png)
@@ -71,14 +73,16 @@ entity.IsDead();
 entity.Destroy();
 ```
 # Components:
-Components are just structs with public fields
+Components are just structs or classes with public fields
 Examples:
 ```C#
+[EcsComponent] // visual debugging and atachment components to entity from inspector
 public struct Health 
 { 
     public int value;
 }
-public struct TransformRef
+[EcsComponent]
+public class TransformRef
 {
     public Transform value;
 }
