@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using UnityEngine;
 
 namespace Wargon.ezs
 {
@@ -11,8 +12,8 @@ namespace Wargon.ezs
         private readonly GrowList<DestroySystem> destroySystemsList = new GrowList<DestroySystem>(4);
         public int id;
         private readonly GrowList<InitSystem> initSystemsList = new GrowList<InitSystem>(4);
-        private readonly TypeMap<int, List<IOnAdd>> onAddSystems = new TypeMap<int, List<IOnAdd>>(4);
-        private readonly TypeMap<int, List<IOnRemove>> onRemoveSystems = new TypeMap<int, List<IOnRemove>>(4);
+        private TypeMap<int, List<IOnAdd>> onAddSystems = new TypeMap<int, List<IOnAdd>>(4);
+        private TypeMap<int, List<IOnRemove>> onRemoveSystems = new TypeMap<int, List<IOnRemove>>(4);
         public GrowList<UpdateSystem> updateSystemsList = new GrowList<UpdateSystem>(16);
         private int updateSystemsCount;
         private readonly World world;
@@ -31,7 +32,7 @@ namespace Wargon.ezs
             Alive = true;
         }
 
-        internal void SetListener(ISystemListener listener)
+        public void SetListener(ISystemListener listener)
         {
             systemBigListener = listener;
             debugMode = systemBigListener != null;
@@ -42,6 +43,8 @@ namespace Wargon.ezs
             updateSystemsList.Add(system);
             system.Init(world.Entities, world);
             system.Update();
+
+            //Injector.InjectEntityType(system, world);
             updateSystemsCount++;
             return this;
         }
@@ -99,29 +102,24 @@ namespace Wargon.ezs
         internal void OnAdd(int type)
         {
             if (!Alive) return;
-            ;
-            if (onAddSystems.HasKey(type))
-                foreach (var system in onAddSystems[type])
-                    system.Execute();
+            if (!onAddSystems.HasKey(type)) return;
+            var cnt = onAddSystems[type].Count;
+            for (var index = 0; index < cnt; index++)
+            {
+                onAddSystems[type][index].Execute();
+            }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal void OnRemove(int type)
         {
             if (!Alive) return;
-            if (onRemoveSystems.HasKey(type))
-                foreach (var system in onRemoveSystems[type])
-                    system.Execute();
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal void OnRemove<T>()
-        {
-            if (!Alive) return;
-            ;
-            if (onRemoveSystems.HasKey(ComponentType<T>.ID))
-                foreach (var system in onRemoveSystems[ComponentType<T>.ID])
-                    system.Execute();
+            if (!onRemoveSystems.HasKey(type)) return;
+            for (var index = 0; index < onRemoveSystems[type].Count; index++)
+            {
+                var system = onRemoveSystems[type][index];
+                system.Execute();
+            }
         }
 
         internal void Kill()
@@ -258,7 +256,7 @@ namespace Wargon.ezs
         protected Entities entities;
         protected World world;
 
-        public void Init(Entities entities, World world)
+        public virtual void Init(Entities entities, World world)
         {
             this.entities = entities;
             this.world = world;

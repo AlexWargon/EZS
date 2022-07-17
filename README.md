@@ -1,5 +1,3 @@
-Actual version https://github.com/AlexWargon/EZS/tree/beta-0.5
-
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ![EZS_LOGO_22](https://user-images.githubusercontent.com/37613162/113684924-62cd8e80-96ce-11eb-8069-6923d4972dd1.png)
@@ -73,10 +71,10 @@ entity.IsDead();
 entity.Destroy();
 ```
 # Components:
-Components are just structs or classes with public fields
+Components are just structs or class with public fields
 Examples:
 ```C#
-[EcsComponent] // visual debugging and atachment components to entity from inspector
+[EcsComponent] // attribute for visual debugging and atachment components to entity from inspector
 public struct Health 
 { 
     public int value;
@@ -109,7 +107,7 @@ public class UpdateExampleSystem : UpdateSystem
 //Call system when component added to some entity
 public class DamageSystem : OnAdd<Damaged> 
 {
-    public override void Execute() 
+    public override void Execute(in Enitity entity) 
     {
         //some logic
     }
@@ -119,7 +117,7 @@ public class DamageSystem : OnAdd<Damaged>
 //Call system when component removed from some entity
 public class OnRemoveSystem : OnRemove<SomeComponent> 
 {
-    public override void Execute() 
+    public override void Execute(in Enitity entity) 
     {
         //some logic
     }
@@ -133,7 +131,7 @@ public class InitExampleSystem : InitSystem
 {
     public override void Execute() 
     {
-        entities.Each((ref Health heath, ref Damaged damage) => 
+        entities.Each((Entity entity, ref Health heath, ref Damaged damage) => 
         {
             //some logic
         });
@@ -174,13 +172,14 @@ public class SingleThreadExampleUpdateSystem : UpdateSystem
 ```
 2. entities.EachThreaded((..........)=>{.....});
 ```C#
-//same think like entities.Each(()=>), but use all threads of CPU!!!
+//same think like entities.Each(()=>), but use all threads of CPU.
 //p.s. it won't work with unity object types like Transform, GameObject, Rigidbody and others :C
 
 public class MultyThreadExampleUpdateSystem  : UpdateSystem 
 {
     public override void Update() 
     {
+        //ref keyword if you use struct as component
         entities.EachThreaded((ref Position pos, ref RayCast ray, ref Impact impact, ref CanReflect reflect, ref BossTag tag) => 
         {
             //some logic
@@ -189,20 +188,34 @@ public class MultyThreadExampleUpdateSystem  : UpdateSystem
 }
 
 ```
-3. You can filter entities not only by including components, but also by exluding
+3. You can filter entities not only by including components, but also by excluding
 ```C#
 public class WithoutSystemExample  : UpdateSystem 
 {
     public override void Update() 
     {
+        //ref keyword if you use struct as component
         entities.Without<UnActive, PlayerTag>().EachThreaded((ref Position pos, ref RayCast ray, ref Impact impact, ref CanReflect reflect, ref BossTag tag) => 
         {
             //some logic
         });
-        entities.Without<UnActive, PlayerTag>().Each((ref Rigidbody rb, ref BoxCollider box) => 
+        //ref keyword if you use struct as component
+        entities.Without<UnActive, PlayerTag>().Each((Rigidbody rb, ref BoxCollider box) => 
         {
             //some logic
         });
     }
 }
 ```
+
+# Unity Integration:
+Entity Wrapper
+
+![image](https://user-images.githubusercontent.com/37613162/168055056-b42cb0d8-a9f5-44e6-bb6d-2f351bdd117c.png)
+
+Systems
+
+![image](https://user-images.githubusercontent.com/37613162/168055250-086ee037-642e-4c0f-a366-2218aeacb189.png)
+
+# Example project
+[Turn Base Game](https://github.com/AlexWargon/TurnBasedGameEcs)
