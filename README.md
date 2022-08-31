@@ -175,7 +175,7 @@ public class SingleThreadExampleUpdateSystem : UpdateSystem
 //same think like entities.Each(()=>), but use all threads of CPU.
 //p.s. it won't work with unity object types like Transform, GameObject, Rigidbody and others :C
 
-public class MultyThreadExampleUpdateSystem  : UpdateSystem 
+public class MultiThreadExampleUpdateSystem  : UpdateSystem 
 {
     public override void Update() 
     {
