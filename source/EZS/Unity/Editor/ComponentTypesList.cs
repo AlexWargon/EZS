@@ -9,8 +9,9 @@ using UnityEditor;
     namespace Wargon.ezs.Unity {
     public static class ComponentTypesList
     {
-        private static Dictionary<Type, Color> Colors = new Dictionary<Type, Color>();
-        private static List<string> Types = new List<string>();
+        private static Dictionary<Type, Color> Colors;
+        private static readonly List<string> Types = new List<string>();
+        public static readonly HashSet<string> NamesHash = new HashSet<string>();
         private static string[] TypesArray;
         private static Type[] typesValue;
         
@@ -22,19 +23,14 @@ using UnityEditor;
 
         public static Type[] GetTypes()
         {
-            if(typesValue.Length < 1)
-                Init();
             return typesValue;
         }
         public static bool IsNUll => !inited;
         private static bool inited;
-
-        static ComponentTypesList()
-        {
-            Init();
-        }
+        
         public static void Init()
         {
+            if(inited) return;
             var assemblies = AppDomain.CurrentDomain.GetAssemblies();
             var listOfComponents = new List<Type>();
             foreach (var assembly in assemblies)
@@ -52,12 +48,16 @@ using UnityEditor;
             listOfComponents.Clear();
             Types.Sort();
             TypesArray = Types.ToArray();
+            for (var i = 0; i < TypesArray.Length; i++)
+            {
+                NamesHash.Add(TypesArray[i]);
+            }
             SetColorStyles(typesValue);
             inited = true;
         }
-
         private static void SetColorStyles(Type[] types)
         {
+            if (Colors == null) Colors = new Dictionary<Type, Color>();
             if(Colors.Count > 1)
                 Colors.Clear();
             for (int i = 0, iMax = types.Length; i < iMax; i++)

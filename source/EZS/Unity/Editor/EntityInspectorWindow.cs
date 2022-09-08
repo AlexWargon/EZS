@@ -11,6 +11,7 @@ namespace Wargon.ezs.Unity
 
         private void OnGUI()
         {
+            EntityGUI.Init();
             DrawInspector();
         }
 
@@ -21,6 +22,7 @@ namespace Wargon.ezs.Unity
 
         private static void DrawInspector()
         {
+            if(Entity==null) return;
             if (Entity.IsDead())
             {
                 GUILayout.Label("ENTITY DEAD ");

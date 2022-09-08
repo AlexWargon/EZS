@@ -1,18 +1,24 @@
 using System;
-using UnityEngine.UIElements;
+using UnityEngine;
 
 namespace Wargon.ezs.Unity
 {
     public interface ITypeInspector
     {
+        Type GetGenericType();
         object DrawIn(string fieldName, object field);
+        object DrawCollectionElement(Rect rect, object element);
     }
 
     public abstract class TypeInspector<T> : ITypeInspector
     {
         public Type FieldType;
-
-        protected TypeInspector()
+        public Type GetGenericType()
+        {
+            return FieldType;
+        }
+        
+        public TypeInspector()
         {
             FieldType = typeof(T);
         }
@@ -24,6 +30,9 @@ namespace Wargon.ezs.Unity
             return Draw(fieldName, ref v);
         }
 
+        public abstract object DrawCollectionElement(Rect rect, object element);
+
         protected abstract object Draw(string fieldName, ref T field);
     }
+
 }

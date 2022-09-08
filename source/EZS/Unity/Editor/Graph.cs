@@ -13,7 +13,7 @@ public class Graph
     private float axisRounding = 1f;
     private int gridLines = 1;
     private string labelFormat = "{0:0.0}";
-    private Color lineColor = Color.red;
+    private Color lineColor = new Color(0f, 1f, 0.5f);
     private int rightLinePadding = -15;
     private readonly float xBorder = 48f;
     private readonly float yBorder = 20f;
@@ -112,7 +112,7 @@ public class Graph
         }
 
         Handles.matrix = Matrix4x4.identity;
-        Handles.DrawAAPolyLine(2f, data.Length, _linePoints);
+        Handles.DrawAAPolyLine(3f, data.Length, _linePoints);
         if (flag)
         {
             position.y -= 16f;

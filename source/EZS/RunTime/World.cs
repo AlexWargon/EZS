@@ -226,17 +226,17 @@
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal void OnAddComponent(int type)
+        internal void OnAddComponent(int type, in Entity entity)
         {
             for (var i = 0; i < systems.Count; i++)
-                systems[i].OnAdd(type);
+                systems[i].OnAdd(type, in entity);
         }
         
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal void OnRemoveComponent(int type)
+        internal void OnRemoveComponent(int type, in Entity entity)
         {
             for (var i = 0; i < systems.Count; i++)
-                systems[i].OnRemove(type);
+                systems[i].OnRemove(type, in entity);
         }
         
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

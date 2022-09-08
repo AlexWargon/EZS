@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 
@@ -42,6 +43,7 @@ namespace Wargon.ezs
         private int[] addedLocked;
         public int Count;
         internal int[] entities;
+        
         public int[] ExcludeTypes;
         public int ExludeCount;
         public int IncludCount;
@@ -50,10 +52,12 @@ namespace Wargon.ezs
         private int[] removedLocked;
 
 
+        private SparseSet sparseSet;
         public EntityType(World world)
         {
             this.world = world;
             Count = 0;
+            sparseSet = new SparseSet(world.EntityTypesCachSize);
             entities = new int[world.EntityCacheSize];
             entitiesMap = new Dictionary<int, int>();
         }
@@ -90,6 +94,7 @@ namespace Wargon.ezs
             entities[Count] = id;
             entitiesMap.Add(id, Count);
             Count++;
+            sparseSet.Add(id);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -105,6 +110,7 @@ namespace Wargon.ezs
                 entities[indexOfEntityId] = lastEntityId;
                 entitiesMap[lastEntityId] = indexOfEntityId;
             }
+            sparseSet.Remove(id);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -120,6 +126,7 @@ namespace Wargon.ezs
                 entities[indexOfEntityId] = lastEntityId;
                 entitiesMap[lastEntityId] = indexOfEntityId;
             }
+            sparseSet.Remove(id);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -139,6 +146,7 @@ namespace Wargon.ezs
             entities[Count] = id;
             entitiesMap.Add(id, Count);
             Count++;
+            sparseSet.Add(id);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -149,6 +157,7 @@ namespace Wargon.ezs
             entities[Count] = entity.id;
             entitiesMap.Add(entity.id, Count);
             Count++;
+            sparseSet.Add(entity.id);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -159,6 +168,7 @@ namespace Wargon.ezs
             entities[Count] = id;
             entitiesMap.Add(id, Count);
             Count++;
+            sparseSet.Add(id);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -174,6 +184,7 @@ namespace Wargon.ezs
                 entities[indexOfEntityId] = lastEntityId;
                 entitiesMap[lastEntityId] = indexOfEntityId;
             }
+            sparseSet.Remove(entity.id);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -247,6 +258,39 @@ namespace Wargon.ezs
         {
             return Count < 1;
         }
+        public class WithOut<NA> : EntityType
+        {
+            public WithOut(World world) : base(world)
+            {
+                ExludeCount = 1;
+                ExcludeTypes = new[]
+                {
+                    ComponentType<NA>.ID
+                };
+                var pool1 = world.GetPool<NA>();
+                pool1.OnAdd += OnAddExclude;
+                pool1.OnRemove += OnRemoveExclude;
+            }
+        }
+
+        public class WithOut<NA, NB> : EntityType
+        {
+            public WithOut(World world) : base(world)
+            {
+                ExludeCount = 2;
+                ExcludeTypes = new[]
+                {
+                    ComponentType<NA>.ID,
+                    ComponentType<NB>.ID
+                };
+                var pool1 = world.GetPool<NA>();
+                pool1.OnAdd += OnAddExclude;
+                pool1.OnRemove += OnRemoveExclude;
+                var pool2 = world.GetPool<NB>();
+                pool2.OnAdd += OnAddExclude;
+                pool2.OnRemove += OnRemoveExclude;
+            }
+        }
     }
 
     public class EntityType<A> : EntityType
@@ -266,7 +310,7 @@ namespace Wargon.ezs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal A GetA(int index)
+        public A GetA(int index)
         {
             return poolA.items[entities[index]];
         }
@@ -884,6 +928,121 @@ namespace Wargon.ezs
                 pool2.OnAdd += OnAddExclude;
                 pool2.OnRemove += OnRemoveExclude;
             }
+        }
+    }
+    public struct SparseSet : IEnumerable<int>
+    {
+        private int _max;      // maximal value the set can contain
+                               // _max = 100; implies a range of [0..99]
+        private int _n;                 // current size of the set
+        public int[] entities;      // dense array
+        private int[] target;      // sparse array
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="SparseSet"/> class.
+        /// </summary>
+        /// <param name="maxValue">The maximal value the set can contain.</param>
+        public SparseSet(int maxValue)
+        {
+            _max = maxValue + 1;
+            _n = 0;
+            entities = new int[_max];
+            target = new int[_max];
+        }
+
+        /// <summary>
+        /// Adds the given value.
+        /// If the value already exists in the set it will be ignored.
+        /// </summary>
+        /// <param name="value">The value.</param>
+        public void Add(int value)
+        {
+
+            if(value > _max)
+            {
+                _max = value + 16;
+                Array.Resize(ref entities, _max);
+                Array.Resize(ref target, _max);
+            }
+
+            if(value >= 0 && value < _max && !Contains(value))
+            {
+                entities[_n] = value;     // insert new value in the dense array...
+                target[value] = _n;     // ...and link it to the sparse array
+                _n++;
+            }
+        }
+
+        /// <summary>
+        /// Removes the given value in case it exists.
+        /// </summary>
+        /// <param name="value">The value.</param>
+        public void Remove(int value)
+        {
+            if(Contains(value))
+            {
+                entities[target[value]] = entities[_n - 1];     // put the value at the end of the dense array
+                                                // into the slot of the removed value
+                target[entities[_n - 1]] = target[value];     // put the link to the removed value in the slot
+                                                // of the replaced value
+                _n--;
+            }
+        }
+
+        /// <summary>
+        /// Determines whether the set contains the given value.
+        /// </summary>
+        /// <param name="value">The value.</param>
+        /// <returns>
+        ///   <c>true</c> if the set contains the given value; otherwise, <c>false</c>.
+        /// </returns>
+        public bool Contains(int value)
+        {
+            if(value >= _max || value < 0)
+                return false;
+            else
+                return target[value] < _n && entities[target[value]] == value;    // value must meet two conditions:
+                                                                    // 1. link value from the sparse array
+                                                                    // must point to the current used range
+                                                                    // in the dense array
+                                                                    // 2. there must be a valid two-way link
+        }
+
+        /// <summary>
+        /// Removes all elements from the set.
+        /// </summary>
+        public void Clear()
+        {
+            _n = 0;     // simply set n to 0 to clear the set; no re-initialization is required
+        }
+
+        /// <summary>
+        /// Gets the number of elements in the set.
+        /// </summary>
+        public int Count
+        {
+            get { return _n; }
+        }
+
+        /// <summary>
+        /// Returns an enumerator that iterates through all elements in the set.
+        /// </summary>
+        /// <returns>
+        /// An <see cref="T:System.Collections.IEnumerator"/> object that can be used to iterate through the collection.
+        /// </returns>
+        public IEnumerator<int> GetEnumerator()
+        {
+            var i = 0;
+            while(i < _n)
+            {
+                yield return entities[i];
+                i++;
+            }
+        }
+
+        IEnumerator IEnumerable.GetEnumerator()
+        {
+            return GetEnumerator();
         }
     }
 }

@@ -18,7 +18,7 @@ namespace Wargon.ezs
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public new void Each<A>(Lambda<Entity, A> action)
             {
-                var entityType = GetEntityTypeFromArrayTypePairWithout<A>();
+                var entityType = GetEntityType<A>();
                 if(entityType.Count < 1) return;
                 var entities = entityType.entities;
                 var a = entityType.poolA.items;
@@ -39,6 +39,22 @@ namespace Wargon.ezs
                     action(entityType.GetEntity(index),
                         a[entities[index]],
                         b[entities[index]]);
+            }
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public new void Each<A>(LambdaCR<Entity, A> action)
+            {
+                var entityType = GetEntityType<A>();
+                if(entityType.Count < 1) return;
+                var entities = entityType.entities;
+                var a = entityType.poolA.items;
+
+                for (var index = entityType.Count-1; index >= 0; index--)
+                {
+                    var entity = entities[index];
+                    action( 
+                        entityType.GetEntity(index),
+                        ref a[entity]);
+                }
             }
             // ReSharper disable Unity.PerformanceAnalysis
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -376,9 +392,17 @@ namespace Wargon.ezs
                 }
             }
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public void Each(Lambda<Entity> action)
+            {
+                var entityType = GetEntityTypeFromArrayTypePairWithout();
+                if(entityType.Count < 1) return;
+                for (var index = entityType.Count-1; index >= 0; index--)
+                    action(entityType.GetEntity(index));
+            }
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public new void Each<A>(Lambda<A> action)
             {
-                var entityType = GetEntityTypeFromArrayTypePairWithout<A>();
+                var entityType = GetEntityType<A>();
                 if(entityType.Count < 1) return;
                 var entities = entityType.entities;
                 var a = entityType.poolA.items;
@@ -465,7 +489,7 @@ namespace Wargon.ezs
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public new void EachThreaded<A>(Lambda<A> lambda)
             {
-                var entities = GetEntityTypeFromArrayTypePairWithout<A>();
+                var entities = GetEntityType<A>();
                 //if (SetNesting(lambda, entities)) return;
                 Parallel.For(0, entities.Count, index =>
                 {
@@ -555,7 +579,7 @@ namespace Wargon.ezs
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public new void EachThreaded<A>(Lambda<Entity, A> action)
             {
-                var entities = GetEntityTypeFromArrayTypePairWithout<A>();
+                var entities = GetEntityType<A>();
 
                 Parallel.For(0, entities.Count, index =>
                 {
@@ -619,9 +643,23 @@ namespace Wargon.ezs
                             entities.poolE.items[entities.entities[index]]);
                 });
             }
-            
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            internal EntityType<A>.WithOut<NA> GetEntityTypeFromArrayTypePairWithout<A>()
+            internal EntityType.WithOut<NA> GetEntityTypeFromArrayTypePairWithout()
+            {
+                var id = TypePair<EntitiesWithout<NA>, EntityType.WithOut<NA>>.Id;
+                CollectionHelp.ValidateEntityTypes(ref entityTypesArray, ref entityTypesActives, id);
+                if (!entityTypesActives[id])
+                {
+                    var newEntityType = new EntityType.WithOut<NA>(world);
+                    world.OnCreateEntityType(newEntityType);
+                    entityTypesArray[id] = newEntityType;
+                    entityTypesActives[id] = true;
+                    entityTypesCount++;
+                }
+                return (EntityType.WithOut<NA>)entityTypesArray[id];
+            }
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public new EntityType<A>.WithOut<NA> GetEntityType<A>()
             {
                 var id = TypePair<EntitiesWithout<NA>, EntityType<A>.WithOut<NA>>.Id;
                 CollectionHelp.ValidateEntityTypes(ref entityTypesArray, ref entityTypesActives, id);

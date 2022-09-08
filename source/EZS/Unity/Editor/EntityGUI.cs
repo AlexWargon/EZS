@@ -8,23 +8,40 @@ namespace Wargon.ezs.Unity
     public static class EntityGUI
     {
         private static Dictionary<int, GUIStyle[]> colorBoxes;
-        private static Dictionary<Type, GUIStyle> newColorBoxes;
+        private static Dictionary<Type, GUIStyle> colorBoxesByType;
         private static bool colored = true;
         private static readonly Color Default = new Color(0.6f, 0.6f, 0.6f, 0.18f);
-
+        public static GUIStyle DEFAULT_STYLE = GUI.skin.box;
         [MenuItem("EZS/Colored On|Off")]
         private static void SetColored()
         {
             colored = !colored;
         }
 
-        static EntityGUI()
+        private static bool inited;
+        public static void Init()
         {
+            if(inited) return;
+            
             colorBoxes = new Dictionary<int, GUIStyle[]>();
-            newColorBoxes = new Dictionary<Type, GUIStyle>();
+            colorBoxesByType = new Dictionary<Type, GUIStyle>();
+            InitColorStyles();
+            Debug.Log("ENTITY GUI RELOAD");
+            inited = true;
         }
-
-        public static GUIStyle GetColorStyle(int componentsCount, int index)
+        private static void InitColorStyles()
+        {
+            var types = ComponentTypesList.GetTypes();
+            for (int i = 0, iMax = ComponentTypesList.Count; i < iMax; i++)
+            {
+                var newType = types[i];
+                var componentColor = ComponentTypesList.GetColorStyle(newType);
+                //componentColor.a = 0.15f;
+                var style = new GUIStyle(GUI.skin.box) {normal = {background = NewTexture(2, 2, componentColor)}};
+                colorBoxesByType.Add(types[i], style);
+            }
+        }
+        public static GUIStyle GetColorStyleByIndex(int componentsCount, int index)
         {
             if (colorBoxes == null) colorBoxes = new Dictionary<int, GUIStyle[]>();
             GUIStyle[] styles;
@@ -38,27 +55,11 @@ namespace Wargon.ezs.Unity
             return styles[index];
         }
 
-        public static GUIStyle GetColorStyle(Type type)
-        {
-            newColorBoxes ??= new Dictionary<Type, GUIStyle>();
+        public static GUIStyle GetColorStyleByType(Type type) {
+            if (colorBoxesByType[type] == null)
+                return GUI.skin.box;
+            return colorBoxesByType[type];
 
-            if (ComponentTypesList.Count != newColorBoxes.Count || !newColorBoxes.ContainsKey(type))
-            {
-                var types = ComponentTypesList.GetTypes();
-                newColorBoxes.Clear();
-                for (int i = 0, iMax = ComponentTypesList.Count; i < iMax; i++)
-                {
-                    var newType = types[i];
-                    var componentColor = ComponentTypesList.GetColorStyle(newType);
-                    componentColor.a = 0.15f;
-                    var style = new GUIStyle(GUI.skin.box) {normal = {background = NewTexture(2, 2, componentColor)}};
-                    newColorBoxes.Add(types[i], style);
-                }
-            }
-            if(newColorBoxes.ContainsKey(type))
-                return newColorBoxes[type];
-            newColorBoxes.Add(type, new GUIStyle(GUI.skin.box));
-            return newColorBoxes[type];
         }
         private static void SetComponentColor(int componentsCount, GUIStyle[] styles)
         {

@@ -108,7 +108,7 @@ public class ListDrawer
                 if (field.Has<View>())
                 {
                     EditorGUI.BeginDisabledGroup(true);
-                    EditorGUILayout.ObjectField($"    View", field.Get<View>().Value, typeof(MonoEntity), true);
+                    EditorGUILayout.ObjectField($"    View", field.Get<View>().value, typeof(MonoEntity), true);
                     EditorGUI.EndDisabledGroup();
                 }
                 else

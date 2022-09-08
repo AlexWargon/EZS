@@ -13,25 +13,43 @@ namespace Wargon.ezs.Unity
     {
         private static bool remove;
         private static int Count;
-        private static readonly Dictionary<Type, ITypeInspector> inspectors;
-        
-        static ComponentInspector()
+        private static Dictionary<Type, ITypeInspector> inspectors;
+        private static Dictionary<Type, ListInspector> listInspectors;
+        private static Dictionary<Type, TextAsset> scriptsAssets;
+        private static Dictionary<Type, bool> csFileExist;
+        private static bool inited;
+        public static void Init()
         {
+            if(inited) return;
             inspectors = new Dictionary<Type, ITypeInspector>();
+            scriptsAssets = new Dictionary<Type, TextAsset>();
+            csFileExist = new Dictionary<Type, bool>();
+            listInspectors = new Dictionary<Type, ListInspector>();
             CrateInspectors();
+            FillScriptAssets();
+            inited = true;
         }
-
+        private static void FillScriptAssets()
+        {
+            var types = ComponentTypesList.GetTypes();
+            for (var i = 0; i < types.Length; i++)
+            {
+                AddScirptAsset(types[i]);
+            }
+        }
         private static void CrateInspectors()
         {
             var assembly = Assembly.GetAssembly(typeof(ITypeInspector));
+            //var newList = new List<ITypeInspector>();
             foreach (var type in assembly.GetTypes())
-                if (typeof(ITypeInspector).IsAssignableFrom(type) && type != typeof(TypeInspector<>) &&
-                    !type.IsInterface)
+            {
+                if (typeof(ITypeInspector).IsAssignableFrom(type) && type != typeof(TypeInspector<>) && !type.IsInterface)
                 {
-                    var inspector = Activator.CreateInstance(type);
-                    var genericType = inspector.GetType().GetField("FieldType").GetValue(inspector) as Type;
-                    inspectors.Add(genericType!, inspector as ITypeInspector);
+                    var inspector = Activator.CreateInstance(type)  as ITypeInspector;
+                    //Debug.Log($"type {inspector.GetType()} --- generic type {inspector.GetGenericType()}");
+                    inspectors.Add(inspector.GetGenericType(), inspector);
                 }
+            }
         }
 
         private static bool IsSubclassOfRawGeneric(Type generic, Type toCheck)
@@ -52,7 +70,7 @@ namespace Wargon.ezs.Unity
             return Activator.CreateInstance(inspectorType.MakeGenericType(type)) as ITypeInspector;
         }
 
-        private static ITypeInspector GetInspector(Type type)
+        public static ITypeInspector GetInspector(Type type)
         {
             return inspectors[type];
         }
@@ -62,7 +80,7 @@ namespace Wargon.ezs.Unity
             Count = count;
             if (entity.ComponentsCount < index) return;
             object component;
-
+            
             Type type;
             if (entity.runTime)
             {
@@ -70,14 +88,14 @@ namespace Wargon.ezs.Unity
                 var pool = entity.Entity.world.ComponentPools[componentTypeID];
                 component = pool.Get(entity.Entity.id);
                 type = pool.ItemType;
-                EntityGUI.Vertical(EntityGUI.GetColorStyle(type), () => { DrawRunTimeMode(entity, component, pool); });
+                EntityGUI.Vertical(EntityGUI.GetColorStyleByType(type), () => { DrawRunTimeMode(entity, component, pool); });
             }
             else
             {
                 component = entity.Components[index];
                 if (component == null) return;
                 type = component.GetType();
-                EntityGUI.Vertical(EntityGUI.GetColorStyle(type), () => { DrawEditorMode(entity, index); });
+                EntityGUI.Vertical(EntityGUI.GetColorStyleByType(type), () => { DrawEditorMode(entity, index); });
             }
 
             if (remove)
@@ -96,16 +114,16 @@ namespace Wargon.ezs.Unity
             var fieldValue = field.GetValue(component);
             var fieldType = field.FieldType;
 
-            if (fieldType == typeof(Object) || fieldType.IsSubclassOf(typeof(Object)))
-            {
-                EntityGUI.Horizontal(() =>
-                {
-                    fieldValue =
-                        EditorGUILayout.ObjectField($"    {field.Name}", fieldValue as Object, fieldType, true);
-                    component.GetType().GetField(field.Name).SetValue(component, fieldValue);
-                });
-                return;
-            }
+             if (fieldType == typeof(Object) || fieldType.IsSubclassOf(typeof(Object)))
+             {
+                 EntityGUI.Horizontal(() =>
+                 {
+                     fieldValue =
+                         EditorGUILayout.ObjectField($"    {field.Name}", fieldValue as Object, fieldType, true);
+                     component.GetType().GetField(field.Name).SetValue(component, fieldValue);
+                 });
+                 return;
+             }
 
             EntityGUI.Horizontal(() => SetFieldValue(fieldValue, field.Name, component));
         }
@@ -115,7 +133,7 @@ namespace Wargon.ezs.Unity
             if (component == null) return;
             var fieldValue = field.GetValue(component);
             var fieldType = field.FieldType;
-
+            
             if (fieldType == typeof(Object) || fieldType.IsSubclassOf(typeof(Object)))
             {
                 EntityGUI.Horizontal(() =>
@@ -134,37 +152,64 @@ namespace Wargon.ezs.Unity
         {
             if (fieldValue == null) return;
             var fieldType = fieldValue.GetType();
+            fieldType = typeof(IList).IsAssignableFrom(fieldType) ? typeof(IList) : fieldType;
+            if (fieldType == typeof(Object) || fieldType.IsSubclassOf(typeof(Object)))
+            {
+                fieldValue = GetInspector(typeof(Object)).DrawIn(fieldName, fieldValue);
+            }
+            else
             if (inspectors.ContainsKey(fieldType))
             {
-                if (typeof(IEnumerable).IsAssignableFrom(fieldType))
-                    fieldValue = GetInspector(typeof(IEnumerable)).DrawIn(fieldName, fieldValue);
+                if (typeof(IList).IsAssignableFrom(fieldType))
+                {
+                    if (GetInspector(typeof(IList)) is ListInspector inspecotr)
+                    {
+                        inspecotr.Init(fieldValue as IList, fieldValue.GetType().GetElementType());
+                        fieldValue = inspecotr.DrawIn(fieldName, fieldValue);
+                    }
+                }
+                
                 else
+                {
                     fieldValue = GetInspector(fieldValue.GetType()).DrawIn(fieldName, fieldValue);
+                    //Debug.Log(fieldValue.GetType());
+                }
             }
 
             component.GetType().GetField(fieldName).SetValue(component, fieldValue);
         }
 
-        public static void SetCollectionElement(object element, string fieldName, Type elementType)
+        public static void SetCollectionElement(Rect rect, object elementValue , int index, string fieldName, Type elementType, object collection)
         {
             if (elementType == typeof(Object) || elementType.IsSubclassOf(typeof(Object)))
             {
                 EntityGUI.Horizontal(() =>
                 {
-                    element = EditorGUILayout.ObjectField($"    {fieldName}", element as Object, elementType, true);
+                    elementValue = EditorGUI.ObjectField(new Rect(rect.x + 10, rect.y, rect.width - 20, EditorGUIUtility.singleLineHeight),$"    {fieldName}", elementValue as Object, elementType, true);
                 });
                 return;
             }
 
-            if (element == null) return;
-            var fieldType = element.GetType();
-            if (inspectors.ContainsKey(fieldType))
+            if (elementValue == null) return;
+
+            elementType = typeof(IList).IsAssignableFrom(elementType) ? typeof(IList) : elementType;
+            if (elementType == typeof(Object) || elementType.IsSubclassOf(typeof(Object)))
             {
-                if (typeof(IEnumerable).IsAssignableFrom(fieldType))
-                    element = GetInspector(typeof(IEnumerable)).DrawIn(fieldName, element);
-                else
-                    element = GetInspector(element.GetType()).DrawIn(fieldName, element);
+                elementValue = GetInspector(typeof(Object)).DrawCollectionElement(new Rect(rect.x + 10, rect.y, rect.width - 20, EditorGUIUtility.singleLineHeight), elementValue);
             }
+            else
+            if (inspectors.ContainsKey(elementType))
+            {
+                if (typeof(IList).IsAssignableFrom(elementType))
+                {
+                    var inspecotr = (ListInspector) GetInspector(typeof(IList));
+                    inspecotr.Init(elementValue as IList, elementValue.GetType().GetElementType());
+                    elementValue = inspecotr.DrawCollectionElement(new Rect(rect.x + 10, rect.y, 250, EditorGUIUtility.singleLineHeight), elementValue);
+                }
+                else
+                    elementValue = GetInspector(elementValue.GetType()).DrawCollectionElement(new Rect(rect.x + 10, rect.y, rect.width - 20, EditorGUIUtility.singleLineHeight), elementValue);
+            }
+            collection.GetType().GetProperty("Item").SetValue(collection, elementValue, new object[] { index });
         }
 
         private static void Remove(MonoEntity entity, int index, MonoEntity[] manyEntities)
@@ -225,6 +270,7 @@ namespace Wargon.ezs.Unity
                 EditorGUILayout.LabelField($"{type.Name}", EditorStyles.boldLabel);
                 RemoveBtn();
             });
+            DrawScirptField(type);
 
             foreach (var field in fields)
                 DrawTypeField(component, field);
@@ -241,7 +287,7 @@ namespace Wargon.ezs.Unity
             EditorGUILayout.LabelField($"{type.Name}", EditorStyles.boldLabel);
             RemoveBtn();
             EditorGUILayout.EndHorizontal();
-
+            DrawScirptField(type);
             for (var i = 0; i < fields.Length; i++)
                 DrawTypeFieldRunTime(component, fields[i]);
 
@@ -256,7 +302,7 @@ namespace Wargon.ezs.Unity
             var pool = entity.world.ComponentPools[componentTypeID];
             var component = pool.Get(entity.id);
             var type = component.GetType();
-            EntityGUI.Vertical(EntityGUI.GetColorStyle(type),
+            EntityGUI.Vertical(EntityGUI.GetColorStyleByType(type),
                 () => { DrawRunTimeMode2(entity, component, type, pool); });
 
             if (remove)
@@ -270,15 +316,49 @@ namespace Wargon.ezs.Unity
             var fields = type.GetFields(BindingFlags.Instance | BindingFlags.Public);
 
             EditorGUILayout.BeginHorizontal();
-            EditorGUILayout.LabelField(component == null ? $"ERROR! {type.Name} IS NULL" : $"{type.Name}",
-                EditorStyles.boldLabel);
+            
+            EditorGUILayout.LabelField(component == null ? $"ERROR! {type.Name} IS NULL" : $"{type.Name}", EditorStyles.boldLabel);
+
             RemoveBtn();
             EditorGUILayout.EndHorizontal();
+
+            DrawScirptField(type);
 
             for (var i = 0; i < fields.Length; i++)
                 DrawTypeFieldRunTime(component, fields[i]);
 
             pool.Set(component, entity.id);
+        }
+
+
+        private static void DrawScirptField(Type type)
+        {
+            if (csFileExist.ContainsKey(type))
+            {
+                var textAsset = scriptsAssets[type];
+                GUI.enabled = false;
+                EditorGUILayout.ObjectField("source", textAsset, typeof(TextAsset), false);
+                GUI.enabled = true;
+            }
+        }
+        private static void AddScirptAsset(Type type)
+        {
+            TextAsset textAsset = null;
+            var guids = AssetDatabase.FindAssets(type.Name);
+            List<TextAsset> textAssetsList = new List<TextAsset>();
+            for (var i = 0; i < guids.Length; i++)
+            {
+                textAsset = AssetDatabase.LoadAssetAtPath<TextAsset>(AssetDatabase.GUIDToAssetPath(guids[i]));
+                if (textAsset != null)
+                    textAssetsList.Add(textAsset);
+            }
+
+            var temp = textAssetsList.FirstOrDefault(x => x.name == type.Name);
+            if (temp != null)
+            {
+                csFileExist.Add(type, true);
+                scriptsAssets.Add(type, temp);
+            }
         }
     }
 }

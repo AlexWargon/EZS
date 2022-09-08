@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq.Expressions;
 using System.Runtime.CompilerServices;
 using System.Threading;
-using Unity.Burst;
 
 namespace Wargon.ezs
 {
@@ -35,6 +34,7 @@ namespace Wargon.ezs
         public void Remove(int entity)
         {
             OnRemove?.Invoke(entity);
+            items[entity] = default;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -48,7 +48,7 @@ namespace Wargon.ezs
         {
             if (length - 1 < id)
             {
-                Array.Resize(ref items, id + 256);
+                Array.Resize(ref items, id + 16);
                 length = items.Length;
             }
 
@@ -56,15 +56,14 @@ namespace Wargon.ezs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Set(int id)
-        {
+        public void Set(int id) {
             if (length - 1 < id)
             {
-                Array.Resize(ref items, id + 256);
+                Array.Resize(ref items, id + 16);
                 length = items.Length;
             }
-            if(items[id] == null)
-                items[id] = (T) Activator.CreateInstance(typeof(T));
+
+            items[id] ??= (T) Activator.CreateInstance(typeof(T));
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -81,7 +80,7 @@ namespace Wargon.ezs
                 // var dif = length > id ? length - id : id - length;
                 // Array.Resize(ref items, 1 + length + dif);
                 // length = items.Length;
-                Array.Resize(ref items, id + 256);
+                Array.Resize(ref items, id + 16);
                 length = items.Length;
             }
             items[id] = (T)component;
@@ -98,7 +97,7 @@ namespace Wargon.ezs
                 // var dif = length > id ? length - id : id - length;
                 // Array.Resize(ref items, 1 + length + dif);
                 // length = items.Length;
-                Array.Resize(ref items, id + 256);
+                Array.Resize(ref items, id + 16);
                 length = items.Length;
             }
 
@@ -112,7 +111,7 @@ namespace Wargon.ezs
                 // var dif = length > id ? length - id : id - length;
                 // Array.Resize(ref items, 1 + length + dif);
                 // length = items.Length;
-                Array.Resize(ref items, id + 256);
+                Array.Resize(ref items, id + 16);
                 length = items.Length;
             }
             items[id] = component;
@@ -282,27 +281,9 @@ namespace Wargon.ezs
                 ID = Interlocked.Increment(ref ComponentTypes.Count);
                 ComponentTypeMap.Add<T>(Value, ID);
             }
-
-            if(Value.IsUnmanaged())
-                ComponentTypeStruct<T>.SetID(ID);
-
         }
     }
-    public struct ComponentTypeStruct<T>
-    {
-        private readonly static SharedStatic<int> typeID;
-        public static int ID
-        {
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get => typeID.Data;
-        }
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void SetID(int ids) => typeID.Data = ids;
-        static ComponentTypeStruct()
-        {
-            typeID = SharedStatic<int>.GetOrCreate<ComponentTypeStruct<T>>();
-        }
-    }
+
     public static class ComponentTypes
     {
         internal static int Count;
@@ -409,7 +390,7 @@ namespace Wargon.ezs
         {
             if (array.Length == id - 1)
             {
-                var newL = array.Length + 256;
+                var newL = array.Length + 16;
                 Array.Resize(ref array, newL);
                 Array.Resize(ref actives, newL);
             }
@@ -420,7 +401,7 @@ namespace Wargon.ezs
         {
             if (array.Length == id - 1)
             {
-                var newL = array.Length + 256;
+                var newL = array.Length + 16;
                 Array.Resize(ref array, newL);
                 Array.Resize(ref actives, newL);
             }

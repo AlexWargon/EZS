@@ -33,7 +33,9 @@ namespace Wargon.ezs.Unity
             var debug = target as WorldDebug;
             var world = debug.world;
 
-            var floatMemory = Profiler.GetTotalAllocatedMemoryLong() / 1048576f;
+
+            //var sss = Profiler.GetMonoUsedSizeLong();
+            var floatMemory = Profiler.GetMonoUsedSizeLong() / 1048576f;
             var mb = floatMemory.ToStringNonAlloc("0.00");
             
             EditorGUILayout.LabelField($"RAM ALLOCATED : {mb} MB");
@@ -61,11 +63,6 @@ namespace Wargon.ezs.Unity
                     EntityDrawers[i].Draw(entities[i],filterComponentString);
                 }
             }
-            // for (var i = 0; i < GUI.skin.customStyles.Length; i++)
-            // {
-            //     if (GUILayout.Toggle(sss,$"{i}", GUI.skin.customStyles[i]))
-            //     {}
-            // }
         }
 
         private void DrawPools(World world)
@@ -140,6 +137,7 @@ namespace Wargon.ezs.Unity
             var componentsCount = data.componentsCount;
             GUILayout.BeginVertical(GUI.skin.box);
             
+            GUILayout.Label($"Entity ID :{entity.id}");
             //EditorGUILayout.LabelField($"Entity ID : {entity.id.ToString()}");
             EditorGUILayout.LabelField($"ECS Components : [{componentsCount}]", EditorStyles.boldLabel);
             for(var index = 0; index < componentsCount; index++)

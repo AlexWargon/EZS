@@ -5,6 +5,11 @@ namespace Wargon.ezs.Unity
 {
     public class QuaternionInspector : TypeInspector<Quaternion>
     {
+        public override object DrawCollectionElement(Rect rect, object element)
+        {
+            throw new System.NotImplementedException();
+        }
+
         protected override object Draw(string fieldName, ref Quaternion field)
         {
             var vec = QuaternionToVector4(field);

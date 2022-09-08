@@ -10,15 +10,18 @@ using Wargon.ezs;
 using Wargon.ezs.Unity;
 using Object = UnityEngine.Object;
 
-public class Pools : MonoBehaviour
-{
-    private static Pools instance;
+public class Pools : MonoBehaviour {
 
+    private const int POOL_MINIMUM_SIZE = 4;
+    public const int POOL_INCREACE_SIZE = 16;
+    public const int POOL_DEFAULT_SIZE = 32;
+    public const int POOL_MAXIMUM_SIZE = 512;
+    private static Pools instance;
     public static Vector3 UnActivePos = new Vector3(-100000f, -100000f, 0);
     [SerializeField] private List<PoolContainer> poolContainers = new List<PoolContainer>();
     private readonly Dictionary<int, Queue<Entity>> entityPool = new Dictionary<int, Queue<Entity>>();
-    private readonly Dictionary<string, PoolContainer> poolMap = new Dictionary<string, PoolContainer>();
-
+    
+    
     private static Pools Instance
     {
         get
@@ -36,30 +39,16 @@ public class Pools : MonoBehaviour
         }
     }
 
+    
     #region ENTITY POOL
 
-    private int poolIncreaseInFrame;
+    private int maxCallPerFrame = 2;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private bool CalledInFrameAlready()
-    {
-        return poolIncreaseInFrame > 0;
+    public static Queue<Entity> GetPool(int poolKey) {
+        return instance.entityPool[poolKey];
     }
-
-    private IEnumerator CheckFrames()
-    {
-        while (true)
-        {
-            yield return null;
-            poolIncreaseInFrame = 0;
-        }
-    }
-
-    private void Start()
-    {
-        StartCoroutine(CheckFrames());
-    }
-
+    
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void CreateEntityPool(MonoEntity prefab, int poolSize)
     {
@@ -78,15 +67,15 @@ public class Pools : MonoBehaviour
             var poolHolder = new PoolContainer(new GameObject(),
                 poolSize, prefab.name, poolKey, poolContainers.Count) {transform = {parent = transform}};
             poolContainers.Add(poolHolder);
-            poolMap.Add(prefab.name, poolHolder);
             for (var i = 0; i < poolSize; i++)
             {
                 var newEntity = Instantiate(prefab);
                 newEntity.ConvertToEntity();
                 var pooled = newEntity.Entity.Get<Pooled>();
-                pooled.SetActive(false);
+                pooled.poolKey = poolKey;
+                
                 pooled.containerIndex = poolHolder.index;
-                entityPool[poolKey].Enqueue(newEntity.Entity);
+                pooled.SetActive(false);
                 pooled.SetParent(poolHolder.transform);
                 pooled.SetName($"[PoolObject] {prefab.name} ID:{pooled.mono.id.ToString()}");
             }
@@ -107,15 +96,15 @@ public class Pools : MonoBehaviour
             var poolHolder = new PoolContainer(new GameObject(), poolSize, prefab.name, poolKey, poolContainers.Count);
             poolHolder.transform.SetParent(parent);
             poolContainers.Add(poolHolder);
-            poolMap.Add(prefab.name, poolHolder);
             for (var i = 0; i < poolSize; i++)
             {
                 var newEntity = Instantiate(prefab);
                 newEntity.ConvertToEntity();
                 var pooled = newEntity.Entity.Get<Pooled>();
-                pooled.SetActive(false);
+                pooled.poolKey = poolKey;
+
                 pooled.containerIndex = poolHolder.index;
-                entityPool[poolKey].Enqueue(newEntity.Entity);
+                pooled.SetActive(false);
                 pooled.SetParent(poolHolder.transform);
 #if UNITY_EDITOR
                 pooled.SetName($"[PoolObject] {prefab.name} ID:{pooled.mono.id.ToString()}");
@@ -147,19 +136,24 @@ public class Pools : MonoBehaviour
         if (entityPool.ContainsKey(poolKey))
         {
             var poolObject = entityPool[poolKey].Dequeue().Get<Pooled>();
-            entityPool[poolKey].Enqueue(poolObject.mono.Entity);
 
-            if (!poolObject.IsActive)
-            {
-                poolObject.Reuse(position, rotation);
-                return poolObject.mono.Entity;
-            }
-
-            AddPoolSize(prefab, 16, poolObject.containerIndex);
-            return ReuseEntityNonStatic(prefab, position, rotation);
+            poolObject.Reuse(position, rotation);
+            if(entityPool[poolKey].Count < POOL_MINIMUM_SIZE)
+                AddPoolSize(prefab, 16, poolObject.containerIndex);
+            return poolObject.mono.Entity;
+            
+            
+            // if (!poolObject.IsActive)
+            // {
+            //     poolObject.Reuse(position, rotation);
+            //     return poolObject.mono.Entity;
+            // }
+            //
+            // AddPoolSize(prefab, POOL_INCREACE_SIZE, poolObject.containerIndex);
+            // return ReuseEntityNonStatic(prefab, position, rotation);
         }
 
-        CreateEntityPool(prefab, 144);
+        CreateEntityPool(prefab, POOL_DEFAULT_SIZE);
         return ReuseEntityNonStatic(prefab, position, rotation);
     }
 
@@ -177,47 +171,28 @@ public class Pools : MonoBehaviour
         if (entityPool.ContainsKey(poolKey))
         {
             var poolObject = entityPool[poolKey].Dequeue().Get<Pooled>();
-            entityPool[poolKey].Enqueue(poolObject.mono.Entity);
-
-            if (!poolObject.IsActive)
-            {
-                poolObject.Reuse(position, rotation);
-                return poolObject.mono.Entity;
-            }
-            if(MAX_POOL_SIZE !< poolContainers[poolObject.containerIndex].size)
+            if(entityPool[poolKey].Count < POOL_MINIMUM_SIZE)
                 AddPoolSize(prefab, 16, poolObject.containerIndex);
-            return ReuseEntityNonStatic(prefab, position, rotation, parent);
+            poolObject.Reuse(position, rotation);
+
+            return poolObject.mono.Entity;
+            
+            // if (!poolObject.IsActive)
+            // {
+            //     poolObject.Reuse(position, rotation);
+            //     return poolObject.mono.Entity;
+            // }
+            // poolIncreaseInFrame++;
+            // if (CanSpawnMoreInFrame())
+            // {
+            //     if(MAX_POOL_SIZE !< poolContainers[poolObject.containerIndex].size)
+            //         AddPoolSize(prefab, 16, poolObject.containerIndex);
+            //     return ReuseEntityNonStatic(prefab, position, rotation, parent);
+            // }
         }
 
-        CreateEntityPoolNonStatic(prefab, 144, parent);
+        CreateEntityPoolNonStatic(prefab, POOL_DEFAULT_SIZE, parent);
         return ReuseEntityNonStatic(prefab, position, rotation, parent);
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Entity ReuseEntity(string name, Vector3 position, Quaternion rotation)
-    {
-        return Instance.ReuseEntityNonStatic(name, position, rotation);
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public Entity ReuseEntityNonStatic(string name, Vector3 position, Quaternion rotation)
-    {
-        if (poolMap.ContainsKey(name))
-        {
-            var poolKey = poolMap[name].poolKey;
-            if (entityPool.ContainsKey(poolKey))
-            {
-                var poolObject = entityPool[poolKey].Dequeue().Get<Pooled>();
-                entityPool[poolKey].Enqueue(poolObject.mono.Entity);
-                if (!poolObject.IsActive)
-                {
-                    poolObject.Reuse(position, rotation);
-                    return poolObject.mono.Entity;
-                }
-            }
-        }
-
-        return default;
     }
 
     private const int MAX_POOL_SIZE = 512;
@@ -230,18 +205,17 @@ public class Pools : MonoBehaviour
         {
             
             var poolHolder = poolContainers[containerIndex];
-            if(poolHolder.size > MAX_POOL_SIZE) return;
             for (var i = 0; i < addPoolSize; i++)
             {
-                if(poolHolder.size > MAX_POOL_SIZE) break;
                 var newEntity = Instantiate(prefab);
                 newEntity.ConvertToEntity();
                 var newObject = newEntity.Entity.Get<Pooled>();
                 newObject.containerIndex = containerIndex;
-                Instance.entityPool[poolKey].Enqueue(newObject.mono.Entity);
+                newObject.poolKey = poolKey;
                 newObject.SetParent(poolHolder.transform);
 #if UNITY_EDITOR
                 newObject.SetName($"[PoolObject] {prefab.name} ID:{newObject.mono.id.ToString()}");
+                Log.Show(Color.yellow, "Pool added");
 #endif
                 newObject.SetActive(false);
                 poolHolder.Add();
@@ -267,26 +241,18 @@ public class Pools : MonoBehaviour
             entityPool.Remove(poolKey);
         }
     }
-
-    //public EcsEntity GetPoolObject(MonoToEntity prefab) {
-    //    int poolKey = prefab.GetInstanceID();
-    //    if (entityPool.ContainsKey(poolKey)) {
-    //        return entityPool[poolKey].Dequeue();
-    //    }
-    //    Debug.LogError($"NO POOL WITH {poolKey} KEY");
-    //    return null;
-    //}
-
     #endregion
 }
 
 [EcsComponent]
-public sealed class Pooled
-{
+public sealed class Pooled {
+    public bool staticPoolSize;
+    public int poolKey;
     public int containerIndex;
     public float CurrentLifeTime;
     public bool IsActive;
     public float LifeTime;
+    public bool StaticLife;
     public MonoEntity mono;
     private Vector2 UnActivePosition = new Vector2(-100000, -100000);
 
@@ -315,8 +281,8 @@ public sealed class Pooled
         else
         {
             mono.Entity.Set<UnActive>();
+            Pools.GetPool(poolKey).Enqueue(mono.Entity);
         }
-
         mono.SetActive(value);
     }
 
@@ -369,7 +335,7 @@ public class PoolContainer
 }
 
 [EcsComponent]
-public class PooledEvent
+public struct PooledEvent
 {
 }
 

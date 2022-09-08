@@ -1,11 +1,8 @@
 ﻿using UnityEditor;
 using UnityEngine;
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using UnityEngine.UIElements;
-using Object = System.Object;
 using PopupWindow = UnityEditor.PopupWindow;
 
 namespace Wargon.ezs.Unity {
@@ -21,15 +18,17 @@ namespace Wargon.ezs.Unity {
         private Rect addButtonRect;
         //private bool editMany;
         private int entitiesCount;
-        
+        private UnityEngine.Object currentDragObject = null;
 
-        public override bool RequiresConstantRepaint()
-        {
+        public override bool RequiresConstantRepaint() {
+            if (monoEntity == null) return false;
+            if (monoEntity.Entity == null) return false;
             return monoEntity.runTime || base.RequiresConstantRepaint();
         }
 
         public override void OnInspectorGUI()
         {
+            EntityGUI.Init();
             //editMany = targets.Length > 1;
             entitiesCount = targets.Length;
             for (var i = 0; i < entitiesCount; i++)
@@ -94,13 +93,52 @@ namespace Wargon.ezs.Unity {
                 }
                 DrawComponents();
             });
+
+            DragAndDropComponent();
+
             EditorGUILayout.LabelField("EZS", EditorStyles.whiteMiniLabel);
             if (EditorGUI.EndChangeCheck())
                 EditorUtility.SetDirty(target);
                 
         }
 
-        
+        private void DragAndDropComponent()
+        {
+            var dragObj = DragAndDrop.objectReferences;
+            if (dragObj.Length > 1)
+            {
+                foreach (var o in dragObj)
+                {
+                    currentDragObject = o;
+                }
+            }
+
+
+            if (Event.current.rawType == EventType.DragExited)
+            {
+                dragObj = DragAndDrop.objectReferences;
+                foreach (var o in dragObj)
+                {
+                    currentDragObject = o;
+                }
+
+                if (dragObj.Length < 1)
+                    currentDragObject = null;
+
+                DragAndDrop.AcceptDrag();
+                if (currentDragObject != null)
+                {
+                    if (ComponentTypesList.NamesHash.Contains(currentDragObject.name))
+                    {
+
+                        AddComponent(currentDragObject.name, monoEntity);
+                    }
+
+                }
+            }
+        }
+
+
         private static object NewObject(Type type) {
             return Activator.CreateInstance(type);
         }
@@ -130,6 +168,7 @@ namespace Wargon.ezs.Unity {
         {
             var type = GetComponentType(componentName);
             if (entity.Components.HasType(type)) {
+                //Debug.LogError($"ENTITY ALREADY HAS '{type}' COMPONENT");
                 return;
             }
 
@@ -152,9 +191,18 @@ namespace Wargon.ezs.Unity {
             EditorUtility.SetDirty(entity);
         }
 
-        private void DrawComponents() {
+        private void DrawComponents() 
+        {
+            //Resolve(monoEntity);
             for (var index = 0; index < monoEntity.ComponentsCount; index++)
+            {
                 ComponentInspector.DrawComponentBox(monoEntity, index, manyEntities, entitiesCount);
+            }
+        }
+
+        private void Resolve(MonoEntity monoEntity)
+        {
+            monoEntity.Components.RemoveAll(x => x == null);
         }
     }
     public static class StringExtensions

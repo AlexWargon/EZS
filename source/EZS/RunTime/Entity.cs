@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
-using UnityEngine;
 using Wargon.ezs.Unity;
 
 namespace Wargon.ezs
@@ -32,7 +31,7 @@ namespace Wargon.ezs
             var pool = world.GetPool<A>();
             pool.Set(component, id);
             pool.Add(id);
-            world.OnAddComponent(typeId);
+            world.OnAddComponent(typeId, this);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -50,7 +49,7 @@ namespace Wargon.ezs
             var pool = world.GetPool<A>();
             pool.Set(component, id);
             pool.Add(id);
-            world.OnAddComponent(typeId);
+            world.OnAddComponent(typeId, this);
         }
 
         // ReSharper disable Unity.PerformanceAnalysis
@@ -59,8 +58,9 @@ namespace Wargon.ezs
         {
             ref var data = ref world.GetEntityData(id);
             var typeId = ComponentType<A>.ID;
-            if (data.generation != generation) throw new Exception("ENTITY NULL OR DESTROYED!");
-
+#if DEBUG
+            if (data.generation != generation) throw new Exception("ENTITY NULL OR DESTROYED! Method: Entity.Get<T>()");
+#endif
             if (data.componentTypes.Contains(typeId)) return world.GetPool<A>().items[id];
 
             data.componentTypes.Add(typeId);
@@ -68,7 +68,7 @@ namespace Wargon.ezs
             var pool = world.GetPool<A>();
             pool.Set(id);
             pool.Add(id);
-            world.OnAddComponent(typeId);
+            world.OnAddComponent(typeId, this);
             return pool.items[id];
         }
         // ReSharper disable Unity.PerformanceAnalysis
@@ -77,8 +77,9 @@ namespace Wargon.ezs
         {
             ref var data = ref world.GetEntityData(id);
             var typeId = ComponentType<A>.ID;
-            if (data.generation != generation) throw new Exception("ENTITY NULL OR DESTROYED!");
-
+#if DEBUG
+            if (data.generation != generation) throw new Exception("ENTITY NULL OR DESTROYED! Method: Entity.GetRef<T>()");
+#endif
             if (data.componentTypes.Contains(typeId)) return ref world.GetPool<A>().items[id];
 
             data.componentTypes.Add(typeId);
@@ -86,7 +87,7 @@ namespace Wargon.ezs
             var pool = world.GetPool<A>();
             pool.Set(id);
             pool.Add(id);
-            world.OnAddComponent(typeId);
+            world.OnAddComponent(typeId, this);
             return ref pool.items[id];
         }
         // ReSharper disable Unity.PerformanceAnalysis
@@ -94,7 +95,9 @@ namespace Wargon.ezs
         public void Set<A>()
         {
             ref var data = ref world.GetEntityData(id);
-            if (data.generation != generation) throw new Exception("ENTITY NULL OR DESTROYED!");
+#if DEBUG
+            if (data.generation != generation) throw new Exception("ENTITY NULL OR DESTROYED! Method: Entity.Set<T>()");
+#endif
             var pool = world.GetPool<A>();
             var typeId = ComponentType<A>.ID;
             if (data.componentTypes.Contains(typeId)) return;
@@ -103,7 +106,7 @@ namespace Wargon.ezs
             data.componentsCount++;
             pool.Set(id);
             pool.Add(id);
-            world.OnAddComponent(typeId);
+            world.OnAddComponent(typeId, this);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -126,7 +129,7 @@ namespace Wargon.ezs
                 var pool = world.GetPool<A>();
                 pool.Set(component, id);
                 pool.Add(id);
-                world.OnAddComponent(typeId);
+                world.OnAddComponent(typeId, this);
             }
         }
 
@@ -137,17 +140,19 @@ namespace Wargon.ezs
             ref var data = ref world.GetEntityData(id);
             if (data.generation != generation)
             {
-                Debug.LogError("ENTITY NULL OR DESTROYED!");
+                UnityEngine.Debug.LogError("ENTITY NULL OR DESTROYED!");
                 return;
             }
             var typeId = ComponentType<A>.ID;
             if (data.componentTypes.Remove(typeId))
             {
-                --data.componentsCount;
+                data.componentsCount--;
                 world.GetPool<A>().Remove(id);
-                world.OnRemoveComponent(typeId);
-                if (data.componentsCount < 1)
+                world.OnRemoveComponent(typeId, this);
+                if (data.componentsCount < 1) {
                     Destroy();
+                    //UnityEngine.Debug.Log($"ENTITY WITH {typeof(A)} DESTTOYED");
+                }
             }
         }
 
@@ -161,9 +166,11 @@ namespace Wargon.ezs
 
             if (data.componentTypes.Remove(typeId))
             {
-                --data.componentsCount;
+                data.componentsCount--;
                 world.GetPoolByID(typeId).Remove(id);
-                world.OnRemoveComponent(typeId);
+                world.OnRemoveComponent(typeId, this);
+                if (data.componentsCount < 1)
+                    Destroy();
             }
         }
 
@@ -173,7 +180,7 @@ namespace Wargon.ezs
             ref var data = ref world.GetEntityData(id);
             if (data.generation != generation)
             {
-                Debug.LogError("ENTITY NULL OR DESTROYED!");
+                UnityEngine.Debug.LogError("ENTITY NULL OR DESTROYED!");
                 return false;
             }
             var typeId = ComponentType<A>.ID;
@@ -192,7 +199,7 @@ namespace Wargon.ezs
                 var pool = world.GetPoolByID(typeId);
 
                 copyData.componentTypes.Add(typeId);
-                world.OnRemoveComponent(typeId);
+                world.OnRemoveComponent(typeId, this);
                 copyData.componentsCount++;
                 pool.Set(copy.id);
             }
@@ -238,8 +245,6 @@ namespace Wargon.ezs
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool IsDead()
         {
-            if (world == null)
-                return true;
             return generation == -1;
         }
 
@@ -269,6 +274,11 @@ namespace Wargon.ezs
         //private static readonly MethodInfo AddComponent = typeof(Entity).GetMethod("Add");
         public static void AddBoxed(this Entity entity, object component)
         {
+            if (component == null)
+            {
+                UnityEngine.Debug.LogError($"Try add null component on entity {entity.id} " + Environment.NewLine +
+                                "Looks like some component on prefab was currupted :C");
+            }
             var type = component.GetType();
             var typeId = ComponentTypeMap.GetID(type);
 
@@ -281,7 +291,7 @@ namespace Wargon.ezs
             data.componentsCount++;
             pool.Set(component, entity.id);
             pool.Add(entity.id);
-            entity.world.OnAddComponent(typeId);
+            entity.world.OnAddComponent(typeId, in entity);
         }
 
         public static bool Has(this Entity entity, int type)
@@ -333,7 +343,7 @@ namespace Wargon.ezs
         
         public static MonoEntity SaveEntity(this Entity entity)
         {
-            var monoEntity = entity.Get<View>().Value;
+            var monoEntity = entity.Get<View>().value;
             var world = entity.world;
             ref var data = ref entity.GetEntityData();
             monoEntity.Components.Clear();
@@ -346,12 +356,13 @@ namespace Wargon.ezs
             
             return monoEntity;
         }
+
     }
 
     public class SavedEntity
     {
-        public Vector3 Position;
-        public Quaternion Rotation;
+        public UnityEngine.Vector3 Position;
+        public UnityEngine.Quaternion Rotation;
         public List<object> Components;
     }
 }
