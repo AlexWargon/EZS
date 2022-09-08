@@ -7,7 +7,7 @@ namespace Wargon.ezs.Unity
 {
     public class FloatInspector : TypeInspector<float>
     {
-        public override object DrawCollectionElement(Rect rect, object element)
+        public override object DrawCollectionElement(Rect rect, object element, int index)
         {
             throw new System.NotImplementedException();
         }

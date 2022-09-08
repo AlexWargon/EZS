@@ -98,7 +98,7 @@ public class ListDrawer
                 break;
             case Entity field:
                 EditorGUILayout.BeginVertical();
-                if (field.IsDead())
+                if (field.IsNULL())
                 {
                     EditorGUILayout.LabelField($"    {fieldName} : NULL");
                     EditorGUILayout.EndVertical();
@@ -108,7 +108,7 @@ public class ListDrawer
                 if (field.Has<View>())
                 {
                     EditorGUI.BeginDisabledGroup(true);
-                    EditorGUILayout.ObjectField($"    View", field.Get<View>().value, typeof(MonoEntity), true);
+                    EditorGUILayout.ObjectField($"    View", field.Get<View>().Value, typeof(MonoEntity), true);
                     EditorGUI.EndDisabledGroup();
                 }
                 else

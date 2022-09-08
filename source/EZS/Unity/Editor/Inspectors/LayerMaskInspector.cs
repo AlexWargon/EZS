@@ -6,7 +6,7 @@ namespace Wargon.ezs.Unity
 {
     public class LayerMaskInspector : TypeInspector<LayerMask>
     {
-        public override object DrawCollectionElement(Rect rect, object element)
+        public override object DrawCollectionElement(Rect rect, object element, int index)
         {
             throw new System.NotImplementedException();
         }

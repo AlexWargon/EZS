@@ -5,7 +5,7 @@ namespace Wargon.ezs.Unity
 {
     public class GradientInspector : TypeInspector<Gradient>
     {
-        public override object DrawCollectionElement(Rect rect, object element)
+        public override object DrawCollectionElement(Rect rect, object element, int index)
         {
             return null;
         }

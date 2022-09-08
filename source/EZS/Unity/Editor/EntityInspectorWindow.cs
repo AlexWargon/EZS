@@ -8,22 +8,22 @@ namespace Wargon.ezs.Unity
     public class EntityInspectorWindow : EditorWindow
     {
         public static Entity Entity;
-
+        
         private void OnGUI()
         {
             EntityGUI.Init();
             DrawInspector();
         }
-
-        private void OnInspectorUpdate()
+        private void Update()
         {
             Repaint();
         }
 
         private static void DrawInspector()
         {
-            if(Entity==null) return;
-            if (Entity.IsDead())
+            if(!Application.isPlaying) return;
+            //if(Entity==default) return;
+            if (Entity.IsNULL())
             {
                 GUILayout.Label("ENTITY DEAD ");
                 return;
@@ -36,7 +36,7 @@ namespace Wargon.ezs.Unity
             //EditorGUILayout.LabelField($"Entity ID : {entity.id.ToString()}");
             EditorGUILayout.LabelField($"Components : [{componentsCount}]", EditorStyles.boldLabel);
             for (var index = 0; index < componentsCount; index++)
-                ComponentInspector.DrawComponentBox(Entity, index);
+                ComponentInspectorInternal.DrawComponentBox(Entity, index);
             GUILayout.EndVertical();
         }
     }
@@ -51,7 +51,7 @@ namespace Wargon.ezs.Unity
         public EntityView(World world, Action<Entity> onFocusEntity)
         {
             this.world = world;
-            buttonStyle = GUI.skin.customStyles[312];
+            buttonStyle = GUI.skin.button;
             buttonStyle.alignment = TextAnchor.MiddleLeft;
             buttonStyle.fontStyle = FontStyle.Bold;
             buttonStyle.fontSize = 12;
@@ -85,7 +85,7 @@ namespace Wargon.ezs.Unity
         public void Draw(Entity entity, string filter)
         {
             if (!Has(filter)) return;
-            if(entity.IsDead()) return;
+            if(entity.IsNULL()) return;
             if (name == string.Empty)
                 EntityToString(entity);
             if (GUILayout.Button(name, buttonStyle)) OnFocusEntity?.Invoke(entity);

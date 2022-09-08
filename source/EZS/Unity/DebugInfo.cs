@@ -9,7 +9,7 @@ namespace Wargon.ezs.Unity
     {
         private List<ISystemListener> systemListeners;
     
-        public DebugInfo(Wargon.ezs.World world)
+        public DebugInfo(World world)
         {
             systemListeners = new List<ISystemListener>();
             var systemsPool = world.GetAllSystems();
@@ -23,8 +23,8 @@ namespace Wargon.ezs.Unity
             Object.DontDestroyOnLoad(worldDebug);
             worldDebug.world = world;
             worldDebug.transform.SetSiblingIndex(0);
-            Debug.Log($"systems count {systemsPool.Count}");
-            for (var i = 0; i < systemsPool.Count; i++)
+            Debug.Log($"systems count {world.GetSystemsCount()}");
+            for (var i = 0; i < world.GetSystemsCount(); i++)
             {
                 var systems = systemsPool[i];
                 var newListener = new SystemsDebug(systems, world);

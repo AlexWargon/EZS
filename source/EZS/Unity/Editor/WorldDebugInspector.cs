@@ -58,7 +58,7 @@ namespace Wargon.ezs.Unity
                     while (EntityDrawers.Count < world.entitiesCount)
                         EntityDrawers.Add(new EntityDrawer(world));
                 }
-                for (var i = 0; i < world.entitiesCount; i++)
+                for (var i = 1; i < world.entitiesCount; i++)
                 {
                     EntityDrawers[i].Draw(entities[i],filterComponentString);
                 }
@@ -67,11 +67,15 @@ namespace Wargon.ezs.Unity
 
         private void DrawPools(World world)
         {
-            var pools = world.ComponentPools;
+            var pools = world.GetAllPoolsInternal();
             for (var i = 0; i < pools.Length; i++)
             {
-                if(pools[i]!=null)
-                    EditorGUILayout.LabelField($" Pool<{ComponentTypeMap.GetTypeByID(pools[i].TypeID).Name}> Size : {pools[i].GetSize()}");
+                if (pools[i] != null)
+                {
+                    EditorGUILayout.LabelField("_________________________________________________________");
+                    EditorGUILayout.LabelField($" Pool<{ComponentTypeMap.GetTypeByID(pools[i].TypeID).Name}>.Size  : {pools[i].GetSize()}");
+                    EditorGUILayout.LabelField($" Pool<{ComponentTypeMap.GetTypeByID(pools[i].TypeID).Name}>.Count : {pools[i].Count}");
+                }
             }
         }
     }
@@ -141,7 +145,7 @@ namespace Wargon.ezs.Unity
             //EditorGUILayout.LabelField($"Entity ID : {entity.id.ToString()}");
             EditorGUILayout.LabelField($"ECS Components : [{componentsCount}]", EditorStyles.boldLabel);
             for(var index = 0; index < componentsCount; index++)
-                ComponentInspector.DrawComponentBox(entity, index);
+                ComponentInspectorInternal.DrawComponentBox(entity, index);
             GUILayout.EndVertical();
         }
     }

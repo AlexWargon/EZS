@@ -5,7 +5,7 @@ namespace Wargon.ezs.Unity
 {
     public class Color32Inspector : TypeInspector<Color32>
     {
-        public override object DrawCollectionElement(Rect rect, object element)
+        public override object DrawCollectionElement(Rect rect, object element, int index)
         {
             throw new System.NotImplementedException();
         }

@@ -1,20 +1,18 @@
-﻿using System;
-using UnityEditor;
+﻿using UnityEditor;
 using UnityEngine;
 
 namespace Wargon.ezs.Unity
 {
     public class StringInspector : TypeInspector<string>
     {
-        public override object DrawCollectionElement(Rect rect, object element)
+        
+        public override object DrawCollectionElement(Rect rect, object element, int index)
         {
-           return EditorGUI.TextField(rect, $"element [1]", element as string);
+           return EditorGUI.TextField(rect, $"element [{index}]", element as string);
         }
 
         protected override object Draw(string fieldName, ref string field) {
-
-            var newValue = EditorGUILayout.TextField (fieldName, field);
-            return newValue;
+            return EditorGUILayout.TextField (fieldName, field);
         }
     }
 }

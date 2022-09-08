@@ -1,7 +1,7 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
-using UnityEngine;
 
 namespace Wargon.ezs
 {
@@ -21,7 +21,7 @@ namespace Wargon.ezs
 
 
     public delegate void LambdaRef<A>(ref A a);
-    public delegate void LambdaI<A>(in A a);
+
     public delegate void LambdaRef<A, B>(ref A a, ref B b);
 
     public delegate void LambdaRef<A, B, C>(ref A a, ref B b, ref C c);
@@ -40,7 +40,6 @@ namespace Wargon.ezs
     public delegate void LambdaRCCC<A, B, C, D>(ref A a, B b, C c, D d) where A : unmanaged;
 
     public delegate void LambdaCR<A, B>(A a, ref B b);
-    public delegate void LambdaCI<A, B>(A a, in B b);
 
     public delegate void LambdaCCR<A, B, C>(A a, B b, ref C c);
 
@@ -53,8 +52,8 @@ namespace Wargon.ezs
     public delegate void LambdaCCCRR<A, B, C, D, E>(A a, B b, C c, ref D d, ref E e);
 
     public delegate void LambdaCCCCRR<A, B, C, D, E, F>(A a, B b, C c, D d, ref E e, ref F f);
-
-    public delegate void LambdaCRefCCC<A, B, C, D, E>(A a, ref B b, C c, D d, E e) where B : unmanaged;
+    public delegate void LambdaCCCRRR<A, B, C, D, E, F>(A a, B b, C c, ref D d, ref E e, ref F f);
+    public delegate void LambdaCRCCC<A, B, C, D, E>(A a, ref B b, C c, D d, E e) where B : unmanaged;
 
     public delegate void LambdaRefIn<A>(ref A a);
 
@@ -72,20 +71,39 @@ namespace Wargon.ezs
         private bool[] entitiesWithoutActives;
         internal EntityType[] entityTypesArray;
         internal bool[] entityTypesActives;
-        private int[] excludedTypes;
+        internal Dictionary<(int,int), OwnerQuery> ownerQueries;
         internal int withoutsCount;
         internal int entityTypesCount;
+        internal int[] WITHOUT_TYPES;
         private readonly World world;
-
+        private int CountEX;
         public Entities(World world)
         {
             this.world = world;
             entityTypesArray = new EntityType[world.EntityTypesCachSize];
             entityTypesActives = new bool[world.EntityTypesCachSize];
             entitiesWithoutArray = new Entities[world.EntityTypesCachSize];
+            ownerQueries = new Dictionary<(int, int), OwnerQuery>();
             entitiesWithoutActives = new bool[world.EntityTypesCachSize];
         }
+        private void OnAddWithoutOnEntity(int id) {
 
+            for (var i = 0; i < entityTypesCount; i++) {
+                entityTypesArray[i].UpdateOnAddWithout(id);
+            }
+        }
+
+        private void OnRemoveWithoutOnEntity(int id) {
+            ref var data = ref world.GetEntityData(id);
+            for (var i = 0; i < CountEX; i++) {
+                if(data.componentTypes.Contains(WITHOUT_TYPES[i])) {
+                    return;
+                }
+            }
+            for (var i = 0; i < entityTypesCount; i++) {
+                entityTypesArray[i].UpdateOnRemoveWithout(in data);
+            }
+        }
 
         internal void Clear()
         {
@@ -99,85 +117,93 @@ namespace Wargon.ezs
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal World GetWorld() => world;
+        
         // ReSharper disable Unity.PerformanceAnalysis
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public EntitiesWithout<NA> Without<NA>()
+        public EntitiesWithout<TWithout> Without<TWithout>() where TWithout : new()
         {
-            var id = EntitiesWithoutID<EntitiesWithout<NA>>.ID;
+            var id = EntitiesWithoutID<EntitiesWithout<TWithout>>.ID;
             CollectionHelp.ValidateEntities(ref entitiesWithoutArray, ref entityTypesActives, id);
-            if (!entitiesWithoutActives[id])
-            {
-                entitiesWithoutArray[id] = new EntitiesWithout<NA>(world);
+            
+            if (!entitiesWithoutActives[id]) {
+                var newWithouts = new EntitiesWithout<TWithout>(world) {
+                    WITHOUT_TYPES = new [] {
+                        ComponentType<TWithout>.ID
+                    }, 
+                    CountEX = 1
+                };
+                var pool = world.GetPoolByID(newWithouts.WITHOUT_TYPES[0]);
+                pool.OnAdd += newWithouts.OnAddWithoutOnEntity;
+                pool.OnRemove += newWithouts.OnRemoveWithoutOnEntity;
+                
+                entitiesWithoutArray[id] = newWithouts;
                 entitiesWithoutActives[id] = true;
                 withoutsCount++;
-                return (EntitiesWithout<NA>) entitiesWithoutArray[id];
             }
-
-            return (EntitiesWithout<NA>) entitiesWithoutArray[id];
+            
+            return (EntitiesWithout<TWithout>) entitiesWithoutArray[id];
         }
 
         // ReSharper disable Unity.PerformanceAnalysis
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public EntitiesWithout<NA, NB> Without<NA, NB>()
+        public EntitiesWithout<TWithout1, TWithout2> Without<TWithout1, TWithout2>() where TWithout1 : new() where TWithout2 : new()
         {
-            var id = EntitiesWithoutID<EntitiesWithout<NA, NB>>.ID;
+            var id = EntitiesWithoutID<EntitiesWithout<TWithout1, TWithout2>>.ID;
             CollectionHelp.ValidateEntities(ref entitiesWithoutArray, ref entityTypesActives, id);
-            if (!entitiesWithoutActives[id])
-            {
-                entitiesWithoutArray[id] = new EntitiesWithout<NA, NB>(world);
+            
+            if (!entitiesWithoutActives[id]) {
+                var newWithouts = new EntitiesWithout<TWithout1, TWithout2>(world) {
+                    WITHOUT_TYPES = new [] {
+                    ComponentType<TWithout1>.ID,
+                    ComponentType<TWithout2>.ID
+                    
+                    }, 
+                    CountEX = 2
+                };
+                var pool1 = world.GetPoolByID(newWithouts.WITHOUT_TYPES[0]);
+                pool1.OnAdd += newWithouts.OnAddWithoutOnEntity;
+                pool1.OnRemove += newWithouts.OnRemoveWithoutOnEntity;
+                
+                var pool2 = world.GetPoolByID(newWithouts.WITHOUT_TYPES[1]);
+                pool2.OnAdd += newWithouts.OnAddWithoutOnEntity;
+                pool2.OnRemove += newWithouts.OnRemoveWithoutOnEntity;
+                
+                entitiesWithoutArray[id] = newWithouts;
                 entitiesWithoutActives[id] = true;
                 withoutsCount++;
             }
 
-            return (EntitiesWithout<NA, NB>) entitiesWithoutArray[id];
+            return (EntitiesWithout<TWithout1, TWithout2>) entitiesWithoutArray[id];
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Clear<A>()
+        public void Clear<A>()  where A: new()
         {
-            var entityType = GetEntityTypeFromArrayTypePairAbstract<A>();
+            var entityType = GetEntityTypeFromArrayTypePair<A>();
             if (entityType.Count < 1) return;
             var entities = entityType.entities;
             for (var index = entityType.Count-1; index >= 0; index--)
                 entityType.GetEntity(entities[index]).Remove<A>();
         }
 
+        public Entities WithOwner(int id) {
+            return this;
+        }
         // ReSharper disable Unity.PerformanceAnalysis
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Each<A>(Lambda<A> action)
+        public void Each<A>(Lambda<A> action)  where A: new()
         {
-            var entityType = GetEntityType<A>();
+            var entityType = GetEntityTypeFromArrayTypePair<A>();
             if (entityType.Count < 1) return;
             var entities = entityType.entities;
             var a = entityType.poolA.items;
             for (var index = entityType.Count-1; index >= 0; index--)
                 action(a[entities[index]]);
         }
+
         // ReSharper disable Unity.PerformanceAnalysis
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Each<A>(LambdaRef<A> action)
-        {
-            var entityType = GetEntityType<A>();
-            if (entityType.Count < 1) return;
-            var entities = entityType.entities;
-            var a = entityType.poolA.items;
-            for (var index = entityType.Count-1; index >= 0; index--)
-                action(ref a[entities[index]]);
-        }
-        // ReSharper disable Unity.PerformanceAnalysis
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Each<A>(LambdaI<A> action)
-        {
-            var entityType = GetEntityType<A>();
-            if (entityType.Count < 1) return;
-            var entities = entityType.entities;
-            var a = entityType.poolA.items;
-            for (var index = entityType.Count-1; index >= 0; index--)
-                action(in a[entities[index]]);
-        }
-        // ReSharper disable Unity.PerformanceAnalysis
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Each<A, B>(Lambda<A, B> action)
+        public void Each<A, B>(Lambda<A, B> action)  where A: new() where B : new()
         {
             var entityType = GetEntityTypeFromArrayTypePair<A, B>();
             if (entityType.Count < 1) return;
@@ -194,7 +220,7 @@ namespace Wargon.ezs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Each<A, B>(LambdaCR<A, B> action)
+        public void Each<A, B>(LambdaCR<A, B> action)  where A: new() where B : new()
         {
             var entityType = GetEntityTypeFromArrayTypePair<A, B>();
             if (entityType.Count < 1) return;
@@ -212,7 +238,7 @@ namespace Wargon.ezs
 
         // ReSharper disable Unity.PerformanceAnalysis
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Each<A, B, C>(Lambda<A, B, C> action)
+        public void Each<A, B, C>(Lambda<A, B, C> action)  where A: new() where B : new() where C : new()
         {
             var entityType = GetEntityTypeFromArrayTypePair<A, B, C>();
             if (entityType.Count < 1) return;
@@ -231,7 +257,7 @@ namespace Wargon.ezs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Each<A, B, C>(LambdaCCR<A, B, C> action)
+        public void Each<A, B, C>(LambdaCCR<A, B, C> action)  where A: new() where B : new() where C : new()
         {
             var entityType = GetEntityTypeFromArrayTypePair<A, B, C>();
             if (entityType.Count < 1) return;
@@ -248,9 +274,26 @@ namespace Wargon.ezs
                     ref c[entity]);
             }
         }
-
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Each<A, B>(LambdaCCR<Entity, A, B> action)
+        public void Each<A, B, C>(LambdaCRR<A, B, C> action)  where A: new() where B : new() where C : new()
+        {
+            var entityType = GetEntityTypeFromArrayTypePair<A, B, C>();
+            if (entityType.Count < 1) return;
+            var entities = entityType.entities;
+            var a = entityType.poolA.items;
+            var b = entityType.poolB.items;
+            var c = entityType.poolС.items;
+            for (var index = entityType.Count-1; index >= 0; index--)
+            {
+                var entity = entities[index];
+                action(
+                    a[entity],
+                    ref b[entity],
+                    ref c[entity]);
+            }
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Each<A, B>(LambdaCCR<Entity, A, B> action)  where A: new() where B : new()
         {
             var entityType = GetEntityTypeFromArrayTypePair<A, B>();
             if (entityType.Count < 1) return;
@@ -266,9 +309,25 @@ namespace Wargon.ezs
                     ref b[entity]);
             }
         }
-
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Each<A, B, C>(LambdaCCCR<Entity, A, B, C> action)
+        public void Each<A, B>(LambdaCRR<Entity, A, B> action)  where A: new() where B : new()
+        {
+            var entityType = GetEntityTypeFromArrayTypePair<A, B>();
+            if (entityType.Count < 1) return;
+            var entities = entityType.entities;
+            var a = entityType.poolA.items;
+            var b = entityType.poolB.items;
+            for (var index = entityType.Count-1; index >= 0; index--)
+            {
+                var entity = entities[index];
+                action(
+                    world.GetEntity(entity),
+                    ref a[entity],
+                    ref b[entity]);
+            }
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Each<A, B, C>(LambdaCCCR<Entity, A, B, C> action)  where A: new() where B : new() where C : new()
         {
             var entityType = GetEntityTypeFromArrayTypePair<A, B, C>();
             if (entityType.Count < 1) return;
@@ -289,7 +348,7 @@ namespace Wargon.ezs
 
         // ReSharper disable Unity.PerformanceAnalysis
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Each<A, B, C, D>(LambdaCCCCR<Entity, A, B, C, D> queue)
+        public void Each<A, B, C, D>(LambdaCCCCR<Entity, A, B, C, D> queue)  where A: new() where B : new() where C : new() where D : new()
         {
             var entityType = GetEntityTypeFromArrayTypePair<A, B, C, D>();
             if (entityType.Count < 1) return;
@@ -311,7 +370,7 @@ namespace Wargon.ezs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Each<A, B, C, D>(LambdaCCCRR<Entity, A, B, C, D> action)
+        public void Each<A, B, C, D>(LambdaCCCRR<Entity, A, B, C, D> action)  where A: new() where B : new() where C : new() where D : new()
         {
             var entityType = GetEntityTypeFromArrayTypePair<A, B, C, D>();
             if (entityType.Count < 1) return;
@@ -331,9 +390,9 @@ namespace Wargon.ezs
                     ref d[entity]);
             }
         }
-
+        
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Each<A, B, C, D, E>(LambdaCCCCR<A, B, C, D, E> action)
+        public void Each<A, B, C, D, E>(LambdaCCCCR<A, B, C, D, E> action)  where A: new() where B : new() where C : new() where D : new() where  E : new()
         {
             var entityType = GetEntityTypeFromArrayTypePair<A, B, C, D, E>();
             if (entityType.Count < 1) return;
@@ -356,7 +415,7 @@ namespace Wargon.ezs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Each<A, B, C, D, E>(LambdaCCCCCR<Entity, A, B, C, D, E> action)
+        public void Each<A, B, C, D, E>(LambdaCCCCCR<Entity, A, B, C, D, E> action)  where A: new() where B : new() where C : new() where D : new() where  E : new()
         {
             var entityType = GetEntityTypeFromArrayTypePair<A, B, C, D, E>();
             if (entityType.Count < 1) return;
@@ -381,7 +440,7 @@ namespace Wargon.ezs
 
         // ReSharper disable Unity.PerformanceAnalysis
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Each<A, B, C, D>(Lambda<A, B, C, D> action)
+        public void Each<A, B, C, D>(Lambda<A, B, C, D> action)  where A: new() where B : new() where C : new() where D : new()
         {
             var entityType = GetEntityTypeFromArrayTypePair<A, B, C, D>();
             if (entityType.Count < 1) return;
@@ -402,7 +461,7 @@ namespace Wargon.ezs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Each<A, B, C, D>(LambdaRCCC<A, B, C, D> action) where A : unmanaged
+        public void Each<A, B, C, D>(LambdaRCCC<A, B, C, D> action)  where A: unmanaged where B : new() where C : new() where D : new()
         {
             var entityType = GetEntityTypeFromArrayTypePair<A, B, C, D>();
             if (entityType.Count < 1) return;
@@ -423,7 +482,7 @@ namespace Wargon.ezs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Each<A, B, C, D>(LambdaCCCR<A, B, C, D> action)
+        public void Each<A, B, C, D>(LambdaCCCR<A, B, C, D> action)  where A: new() where B : new() where C : new() where D : new()
         {
             var entityType = GetEntityTypeFromArrayTypePair<A, B, C, D>();
             if (entityType.Count < 1) return;
@@ -444,7 +503,7 @@ namespace Wargon.ezs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Each<A, B, C, D, E>(Lambda<A, B, C, D, E> action)
+        public void Each<A, B, C, D, E>(Lambda<A, B, C, D, E> action)  where A: new() where B : new() where C : new() where D : new() where  E : new()
         {
             var entityType = GetEntityTypeFromArrayTypePair<A, B, C, D, E>();
             if (entityType.Count < 1) return;
@@ -465,9 +524,9 @@ namespace Wargon.ezs
 
         // ReSharper disable Unity.PerformanceAnalysis
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Each<A>(Lambda<Entity, A> action)
+        public void Each<A>(Lambda<Entity, A> action)  where A: new()
         {
-            var entityType = GetEntityType<A>();
+            var entityType = GetEntityTypeFromArrayTypePair<A>();
             if (entityType.Count < 1) return;
             var entities = entityType.entities;
             var a = entityType.poolA.items;
@@ -477,9 +536,9 @@ namespace Wargon.ezs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Each<A>(LambdaCR<Entity, A> action)
+        public void Each<A>(LambdaCR<Entity, A> action)  where A: new()
         {
-            var entityType = GetEntityType<A>();
+            var entityType = GetEntityTypeFromArrayTypePair<A>();
             if (entityType.Count < 1) return;
             var entities = entityType.entities;
             var a = entityType.poolA.items;
@@ -487,31 +546,10 @@ namespace Wargon.ezs
                 action(entityType.GetEntity(index),
                     ref a[entities[index]]);
         }
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Each<A>(LambdaCI<Entity, A> action)
-        {
-            var entityType = GetEntityType<A>();
-            if (entityType.Count < 1) return;
-            var entities = entityType.entities;
-            var a = entityType.poolA.items;
-            for (var index = entityType.Count-1; index >= 0; index--)
-                action(entityType.GetEntity(index),
-                    in a[entities[index]]);
-        }
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Each<A>(LambdaCI<int, A> action)
-        {
-            var entityType = GetEntityType<A>();
-            if (entityType.Count < 1) return;
-            var entities = entityType.entities;
-            var a = entityType.poolA.items;
-            for (var index = entityType.Count-1; index >= 0; index--)
-                action(entities[index],
-                    in a[entities[index]]);
-        }
+
         // ReSharper disable Unity.PerformanceAnalysis
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Each<A, B>(Lambda<Entity, A, B> action)
+        public void Each<A, B>(Lambda<Entity, A, B> action)  where A: new() where B : new()
         {
             var entityType = GetEntityTypeFromArrayTypePair<A, B>();
             if (entityType.Count < 1)
@@ -529,7 +567,7 @@ namespace Wargon.ezs
 
         // ReSharper disable Unity.PerformanceAnalysis
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Each<A, B, C>(Lambda<Entity, A, B, C> action)
+        public void Each<A, B, C>(Lambda<Entity, A, B, C> action)  where A: new() where B : new() where C : new()
         {
             var entityType = GetEntityTypeFromArrayTypePair<A, B, C>();
             if (entityType.Count < 1) return;
@@ -546,7 +584,7 @@ namespace Wargon.ezs
 
         // ReSharper disable Unity.PerformanceAnalysis
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Each<A, B, C, D>(Lambda<Entity, A, B, C, D> action)
+        public void Each<A, B, C, D>(Lambda<Entity, A, B, C, D> action) where A: new() where B : new() where C : new() where D : new()
         {
             var entityType = GetEntityTypeFromArrayTypePair<A, B, C, D>();
             if (entityType.Count < 1) return;
@@ -564,7 +602,7 @@ namespace Wargon.ezs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Each<A, B, C, D>(LambdaCRefCCC<Entity, A, B, C, D> action) where A : unmanaged
+        public void Each<A, B, C, D>(LambdaCRCCC<Entity, A, B, C, D> action) where A: unmanaged where B : new() where C : new() where D : new()
         {
             var entityType = GetEntityTypeFromArrayTypePair<A, B, C, D>();
             if (entityType.Count < 1) return;
@@ -583,7 +621,7 @@ namespace Wargon.ezs
 
         // ReSharper disable Unity.PerformanceAnalysis
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Each<A, B, C, D, E>(Lambda<Entity, A, B, C, D, E> action)
+        public void Each<A, B, C, D, E>(Lambda<Entity, A, B, C, D, E> action) where A: new() where B : new() where C : new() where D : new() where  E : new()
         {
             var entityType = GetEntityTypeFromArrayTypePair<A, B, C, D, E>();
             if (entityType.Count < 1) return;
@@ -603,7 +641,7 @@ namespace Wargon.ezs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Each<A, B, C, D, E, F>(Lambda<Entity, A, B, C, D, E, F> action)
+        public void Each<A, B, C, D, E, F>(Lambda<Entity, A, B, C, D, E, F> action) where A: new() where B : new() where C : new() where D : new() where  E : new() where  F : new()
         {
             var entityType = GetEntityTypeFromArrayTypePair<A, B, C, D, E, F>();
             if (entityType.Count < 1) return;
@@ -625,15 +663,15 @@ namespace Wargon.ezs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void EachThreaded<A>(Lambda<A> lambda)
+        public void EachThreaded<A>(Lambda<A> lambda) where A: new()
         {
-            var entities = GetEntityType<A>();
+            var entities = GetEntityTypeFromArrayTypePair<A>();
 
             Parallel.For(0, entities.Count, i => { lambda(entities.poolA.items[entities.entities[i]]); });
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void EachThreaded<A, B>(Lambda<A, B> lambda)
+        public void EachThreaded<A, B>(Lambda<A, B> lambda) where A: new() where B : new()
         {
             var entityType = GetEntityTypeFromArrayTypePair<A, B>();
             var entities = entityType.entities;
@@ -647,7 +685,7 @@ namespace Wargon.ezs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void EachThreaded<A, B, C>(Lambda<A, B, C> lambda)
+        public void EachThreaded<A, B, C>(Lambda<A, B, C> lambda) where A: new() where B : new() where C : new()
         {
             var entities = GetEntityTypeFromArrayTypePair<A, B, C>();
 
@@ -660,7 +698,7 @@ namespace Wargon.ezs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void EachThreaded<A, B, C, D>(Lambda<A, B, C, D> lambda)
+        public void EachThreaded<A, B, C, D>(Lambda<A, B, C, D> lambda)  where A: new() where B : new() where C : new() where D : new()
         {
             var entityType = GetEntityTypeFromArrayTypePair<A, B, C, D>();
             var entities = entityType.entities;
@@ -678,7 +716,7 @@ namespace Wargon.ezs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void EachThreaded<A, B, C, D, E>(Lambda<A, B, C, D, E> lambda)
+        public void EachThreaded<A, B, C, D, E>(Lambda<A, B, C, D, E> lambda)  where A: new() where B : new() where C : new() where D : new() where  E : new()
         {
             var entities = GetEntityTypeFromArrayTypePair<A, B, C, D, E>();
 
@@ -693,9 +731,9 @@ namespace Wargon.ezs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void EachThreaded<A>(Lambda<Entity, A> action)
+        public void EachThreaded<A>(Lambda<Entity, A> action)  where A: new()
         {
-            var entities = GetEntityType<A>();
+            var entities = GetEntityTypeFromArrayTypePair<A>();
 
             Parallel.For(0, entities.Count, i =>
             {
@@ -705,7 +743,7 @@ namespace Wargon.ezs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void EachThreaded<A, B>(Lambda<Entity, A, B> action)
+        public void EachThreaded<A, B>(Lambda<Entity, A, B> action)  where A: new() where B : new()
         {
             var entities = GetEntityTypeFromArrayTypePair<A, B>();
 
@@ -718,7 +756,7 @@ namespace Wargon.ezs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void EachThreaded<A, B>(LambdaRef<A, B> action)
+        public void EachThreaded<A, B>(LambdaRef<A, B> action)  where A: new() where B : new()
         {
             var entityType = GetEntityTypeFromArrayTypePair<A, B>();
             var entities = entityType.entities;
@@ -732,7 +770,7 @@ namespace Wargon.ezs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void EachThreaded<A, B, C>(Lambda<Entity, A, B, C> action)
+        public void EachThreaded<A, B, C>(Lambda<Entity, A, B, C> action)  where A: new() where B : new() where C : new()
         {
             var entities = GetEntityTypeFromArrayTypePair<A, B, C>();
 
@@ -746,7 +784,7 @@ namespace Wargon.ezs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void EachThreaded<A, B, C, D>(Lambda<Entity, A, B, C, D> action)
+        public void EachThreaded<A, B, C, D>(Lambda<Entity, A, B, C, D> action)  where A: new() where B : new() where C : new() where D : new()
         {
             var entities = GetEntityTypeFromArrayTypePair<A, B, C, D>();
 
@@ -761,7 +799,7 @@ namespace Wargon.ezs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void EachThreaded<A, B, C, D, E>(Lambda<Entity, A, B, C, D, E> action)
+        public void EachThreaded<A, B, C, D, E>(Lambda<Entity, A, B, C, D, E> action)  where A: new() where B : new() where C : new() where D : new() where  E : new()
         {
             var entities = GetEntityTypeFromArrayTypePair<A, B, C, D, E>();
 
@@ -777,7 +815,7 @@ namespace Wargon.ezs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public EntityType<A> GetEntityType<A>()
+        public EntityType<A> GetEntityTypeFromArrayTypePair<A>()  where A: new()
         {
             var id = TypePair<Entities, EntityType<A>>.Id;
             CollectionHelp.ValidateEntityTypes(ref entityTypesArray, ref entityTypesActives, id);
@@ -793,7 +831,7 @@ namespace Wargon.ezs
             return (EntityType<A>) entityTypesArray[id];
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public EntityType GetEntityTypeFromArrayTypePairAbstract<A>()
+        public EntityType GetEntityTypeFromArrayTypePairAbstract<A>()  where A: new()
         {
             var id = TypePair<Entities, EntityType<A>>.Id;
             CollectionHelp.ValidateEntityTypes(ref entityTypesArray, ref entityTypesActives, id);
@@ -809,7 +847,7 @@ namespace Wargon.ezs
             return entityTypesArray[id];
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public EntityType GetEntityTypeFromArrayTypePairAbstractAndAddSystem<A>(UpdateSystem updateSystem)
+        public EntityType GetEntityTypeFromArrayTypePairAbstractAndAddSystem<A>(UpdateSystem updateSystem)  where A: new()
         {
             var id = TypePair<Entities, EntityType<A>>.Id;
             CollectionHelp.ValidateEntityTypes(ref entityTypesArray, ref entityTypesActives, id);
@@ -825,7 +863,7 @@ namespace Wargon.ezs
             return entityTypesArray[id];
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public EntityType<A, B> GetEntityTypeFromArrayTypePair<A, B>()
+        public EntityType<A, B> GetEntityTypeFromArrayTypePair<A, B>()  where A: new() where B : new()
         {
             var id = TypePair<Entities, EntityType<A, B>>.Id;
             CollectionHelp.ValidateEntityTypes(ref entityTypesArray, ref entityTypesActives, id);
@@ -842,7 +880,7 @@ namespace Wargon.ezs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public EntityType<A, B, C> GetEntityTypeFromArrayTypePair<A, B, C>()
+        public EntityType<A, B, C> GetEntityTypeFromArrayTypePair<A, B, C>()  where A: new() where B : new() where C : new()
         {
             var id = TypePair<Entities, EntityType<A, B, C>>.Id;
             CollectionHelp.ValidateEntityTypes(ref entityTypesArray, ref entityTypesActives, id);
@@ -859,7 +897,7 @@ namespace Wargon.ezs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public EntityType<A, B, C, D> GetEntityTypeFromArrayTypePair<A, B, C, D>()
+        public EntityType<A, B, C, D> GetEntityTypeFromArrayTypePair<A, B, C, D>()  where A: new() where B : new() where C : new() where D : new()
         {
             var id = TypePair<Entities, EntityType<A, B, C, D>>.Id;
             CollectionHelp.ValidateEntityTypes(ref entityTypesArray, ref entityTypesActives, id);
@@ -876,7 +914,7 @@ namespace Wargon.ezs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public EntityType<A, B, C, D, E> GetEntityTypeFromArrayTypePair<A, B, C, D, E>()
+        public EntityType<A, B, C, D, E> GetEntityTypeFromArrayTypePair<A, B, C, D, E>()  where A: new() where B : new() where C : new() where D : new() where  E : new()
         {
             var id = TypePair<Entities, EntityType<A, B, C, D, E>>.Id;
             CollectionHelp.ValidateEntityTypes(ref entityTypesArray, ref entityTypesActives, id);
@@ -893,9 +931,9 @@ namespace Wargon.ezs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public EntityType<A, B, C, D, E, F> GetEntityTypeFromArrayTypePair<A, B, C, D, E, F>()
+        public EntityType<A, B, C, D, E, F> GetEntityTypeFromArrayTypePair<A, B, C, D, E, F>()  where A: new() where B : new() where C : new() where D : new() where  E : new() where  F : new()
         {
-            var id = TypePair<Entities, EntityType<A, B, C, D, E, F>>.Id;
+            ref var id = ref TypePair<Entities, EntityType<A, B, C, D, E, F>>.Id;
             CollectionHelp.ValidateEntityTypes(ref entityTypesArray, ref entityTypesActives, id);
             if (entityTypesActives[id] == false)
             {
@@ -909,9 +947,9 @@ namespace Wargon.ezs
             return (EntityType<A, B, C, D, E, F>) entityTypesArray[id];
         }
 
-        public virtual void AddNewEntityType<A>(EntityType entityType)
+        public virtual void AddNewEntityType<A>(A entityType)  where A: EntityType
         {
-            var id = TypePair<Entities, EntityType<A>>.Id;
+            var id = TypePair<Entities, A>.Id;
             CollectionHelp.ValidateEntityTypes(ref entityTypesArray, ref entityTypesActives, id);
             if (entityTypesActives[id] == false)
             {
@@ -921,7 +959,7 @@ namespace Wargon.ezs
                 entityTypesCount++;
             }
         }
-        public void Each<A, B>(LambdaRef<A, B> action)
+        public void Each<A, B>(LambdaRef<A, B> action) where A: new() where B : new()
         {
             var entityType = GetEntityTypeFromArrayTypePair<A, B>();
             if(entityType.Count < 1) return;
@@ -936,7 +974,7 @@ namespace Wargon.ezs
                     ref b[entity]);
             }
         }
-        public void Each<A, B, C>(LambdaRef<A, B, C> action)
+        public void Each<A, B, C>(LambdaRef<A, B, C> action) where A: new() where B : new() where C : new()
         {
             var entityType = GetEntityTypeFromArrayTypePair<A, B, C>();
             if(entityType.Count < 1) return;
@@ -954,30 +992,98 @@ namespace Wargon.ezs
             }
         }
         
-        private static class EntitiesWithoutID<T>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal OwnerQuery GetOwnerQuery(int id)
+        {
+            var key = (id,-1);
+            if (!ownerQueries.ContainsKey(key))
+            {
+                var q = new OwnerQuery(world).WithOwner(id);
+                world.OnCreateEntityType(q);
+                ownerQueries.Add(key, q);
+            }
+            return ownerQueries[key];
+        }
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public OwnerQuery GetOwnerQuery<T1>(int id) where T1 : new()
+        {
+            var key = (id,TypeWithInt<T1>.ID);
+            if (!ownerQueries.ContainsKey(key))
+            {
+                var q = new OwnerQuery(world).WithOwner(id).With<T1>();
+                world.OnCreateEntityType(q);
+                ownerQueries.Add(key, q);
+            }
+            return ownerQueries[key];
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public OwnerQuery GetOwnerQuery<T1,T2>(int id) where T1 : new() where T2 : new()
+        {
+            var key = (id,TypeWithInt<T1,T2>.ID);
+            if (!ownerQueries.ContainsKey(key))
+            {
+                var q = new OwnerQuery(world).WithOwner(id).With<T1>().With<T2>();
+                world.OnCreateEntityType(q);
+                ownerQueries.Add(key, q);
+            }
+            return ownerQueries[key];
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void EachWithOwner<A>(int ownerID, Lambda<A> action) where A: new()
+        {
+            var entityType = GetOwnerQuery<A>(ownerID);
+            if (entityType.Count < 1) return;
+            var entities = entityType.entities;
+            var a = world.GetPool<A>().items;
+            for (var index = entityType.Count-1; index >= 0; index--)
+                action(a[entities[index]]);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void EachWithOwner<A, B>(int ownerID, Lambda<A, B> action) where A: new() where B : new() {
+            var entityType = GetOwnerQuery<A,B>(ownerID);
+            if (entityType.Count < 1) return;
+            var entities = entityType.entities;
+            var a = world.GetPool<A>().items;
+            var b = world.GetPool<B>().items;
+            for (var index = entityType.Count-1; index >= 0; index--)
+                action(a[entities[index]], b[entities[index]]);
+        }
+        private struct EntitiesWithoutID<T>
         {
             public static readonly int ID;
-
             static EntitiesWithoutID()
             {
                 ID = EntitiesWithoutCount.Count++;
             }
         }
 
-        private static class EntitiesWithoutCount
+        private struct EntitiesWithoutCount
         {
             public static int Count;
         }
-        
-        
-        
-    }
 
-    internal struct EntityForEach
-    {
-        public EntityForEach Without<A>()
+        private struct TypeWithInt<A>
         {
-            return this;
+            public static readonly int ID;
+            static TypeWithInt()
+            {
+                ID = TypeWithIntCount.Value++;
+            }
+        }
+        private struct TypeWithInt<A, B>
+        {
+            public static readonly int ID;
+            static TypeWithInt()
+            {
+                ID = TypeWithIntCount.Value++;
+            }
+        }
+        public static class TypeWithIntCount
+        {
+            public static int Value;
         }
     }
+
 }

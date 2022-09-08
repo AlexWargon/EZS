@@ -2,6 +2,9 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
+using UnityEngine;
+using UnityEngine.UIElements;
 
 namespace Wargon.ezs
 {
@@ -38,67 +41,112 @@ namespace Wargon.ezs
 
     public abstract class EntityType
     {
-        internal readonly Dictionary<int, int> entitiesMap;
-        private readonly World world;
-        private int[] addedLocked;
+        //internal readonly Dictionary<int, int> entitiesMap;
+
+        protected readonly World world;
         public int Count;
-        internal int[] entities;
-        
-        public int[] ExcludeTypes;
-        public int ExludeCount;
-        public int IncludCount;
-        public int[] IncludTypes;
-
-        private int[] removedLocked;
-
-
-        private SparseSet sparseSet;
+        public int[] entities;
+        internal int[] ExcludeTypes;
+        internal int[] IncludeTypes;
+        internal readonly IntMap entitiesMap;
+        internal int ExcludeCount;
+        internal int IncludeCount;
+        internal int currentIndex;
         public EntityType(World world)
         {
             this.world = world;
             Count = 0;
-            sparseSet = new SparseSet(world.EntityTypesCachSize);
             entities = new int[world.EntityCacheSize];
-            entitiesMap = new Dictionary<int, int>();
+            entitiesMap = new IntMap(world.EntityCacheSize);
+            IncludeTypes = new int[10];
+            ExcludeTypes = new int[6];
         }
 
-        public int[] GetIDQuery()
-        {
-            var result = new int[Count];
-            Array.Copy(entities, 0, result, 0, Count);
-            return result;
+        protected void SubWith<T>() where T : new() {
+            var type = ComponentType<T>.ID;
+            IncludeTypes[IncludeCount] = type;
+            var pool1 = world.GetPool<T>();
+            pool1.OnAdd += OnAddInclude;
+            pool1.OnRemove += OnRemoveInclude;
+            IncludeCount++;
         }
-
+        protected void SubWith<T>(Pool<T> reference) where T : new() {
+            var type = ComponentType<T>.ID;
+            IncludeTypes[IncludeCount] = type;
+            var pool1 = world.GetPool<T>();
+            reference = pool1;
+            reference.OnAdd += OnAddInclude;
+            reference.OnRemove += OnRemoveInclude;
+            IncludeCount++;
+        }
+        protected void SubWithout<T>() where T : new() {
+            var type = ComponentType<T>.ID;
+            ExcludeTypes[ExcludeCount] = type;
+            var pool1 = world.GetPool<T>();
+            pool1.OnAdd += OnAddInclude;
+            pool1.OnRemove += OnRemoveInclude;
+            IncludeCount++;
+        }
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public Entity[] GetEntityQuery()
         {
             var result = new Entity[Count];
             for (var i = 0; i < result.Length; i++) result[i] = world.GetEntity(entities[i]);
             return result;
         }
-
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal void OnAddInclude(int id)
-        {
+        public void OnAddIncludeRemoveExclude(int id) {
             if (HasEntity(id)) return;
             ref var data = ref world.GetEntityData(id);
-
-            for (var i = 0; i < ExludeCount; i++)
+            for (var i = 0; i < ExcludeCount; i++)
                 if (data.componentTypes.Contains(ExcludeTypes[i]))
                     return;
 
-            for (var i = 0; i < IncludCount; i++)
-                if (!data.componentTypes.Contains(IncludTypes[i]))
+            for (var i = 0; i < IncludeCount; i++)
+                if (!data.componentTypes.Contains(IncludeTypes[i]))
                     return;
 
-            if (entities.Length == Count) Array.Resize(ref entities, entities.Length << 1);
-            entities[Count] = id;
-            entitiesMap.Add(id, Count);
+            if (entities.Length == Count) Array.Resize(ref entities, world.entitiesCount+2);
+            entities[Count] = data.id;
+            entitiesMap.Add(data.id, Count);
             Count++;
-            sparseSet.Add(id);
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void OnRemoveIncludeAddExclude(int id) {
+            
+            var lastEntityId = entities[Count - 1];
+            var indexOfEntityId = entitiesMap[id];
+            entitiesMap.Remove(id);
+            Count--;
+            if (Count > indexOfEntityId)
+            {
+                entities[indexOfEntityId] = lastEntityId;
+                entitiesMap.Add(lastEntityId, indexOfEntityId);
+            }
+        }
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public virtual void OnAddInclude(int id)
+        {
+            if (HasEntity(id)) return;
+            ref var data = ref world.GetEntityData(id);
+            for (var i = 0; i < ExcludeCount; i++)
+                if (data.componentTypes.Contains(ExcludeTypes[i]))
+                    return;
+
+            for (var i = 0; i < IncludeCount; i++)
+                if (!data.componentTypes.Contains(IncludeTypes[i]))
+                    return;
+
+            if (entities.Length == Count) Array.Resize(ref entities, Count+16);
+            entities[Count] = data.id;
+            entitiesMap.Add(data.id, Count);
+            Count++;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal void OnRemoveInclude(int id)
+        public virtual void OnRemoveInclude(int id)
         {
             if (!HasEntity(id)) return;
             var lastEntityId = entities[Count - 1];
@@ -108,13 +156,63 @@ namespace Wargon.ezs
             if (Count > indexOfEntityId)
             {
                 entities[indexOfEntityId] = lastEntityId;
-                entitiesMap[lastEntityId] = indexOfEntityId;
+                entitiesMap.Add(lastEntityId, indexOfEntityId);
             }
-            sparseSet.Remove(id);
         }
-
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal void OnAddExclude(int id)
+        public void UpdateOnAddWith(ref EntityData data) {
+            for (var i = 0; i < IncludeCount; i++)
+                if (!data.componentTypes.Contains(IncludeTypes[i]))
+                    return;
+
+            if (entities.Length == Count) Array.Resize(ref entities, Count+16);
+            entities[Count] = data.id;
+            entitiesMap.Add(data.id, Count);
+            Count++;
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void UpdateOnRemoveWith(int id) {
+            if (!HasEntity(id)) return;
+            var lastEntityId = entities[Count - 1];
+            var indexOfEntityId = entitiesMap[id];
+            entitiesMap.Remove(id);
+            Count--;
+            if (Count > indexOfEntityId)
+            {
+                entities[indexOfEntityId] = lastEntityId;
+                entitiesMap.Add(lastEntityId, indexOfEntityId);
+            }
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public virtual void UpdateOnAddWithout(int id) {
+
+            if (!HasEntity(id)) return;
+            var lastEntityId = entities[Count - 1];
+            var indexOfEntityId = entitiesMap[id];
+            entitiesMap.Remove(id);
+            Count--;
+            if (Count > indexOfEntityId)
+            {
+                entities[indexOfEntityId] = lastEntityId;
+                entitiesMap.Add(lastEntityId, indexOfEntityId);
+            }
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public virtual void UpdateOnRemoveWithout(in EntityData data) {
+            if (HasEntity(data.id)) return;
+
+            for (var i = 0; i < IncludeCount; i++)
+                if (!data.componentTypes.Contains(IncludeTypes[i]))
+                    return;
+
+            if (entities.Length == Count) Array.Resize(ref entities, world.entitiesCount+2);
+            entities[Count] = data.id;
+            entitiesMap.Add(data.id, Count);
+            Count++;
+        }
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public virtual void OnAddExclude(int id)
         {
             if (!HasEntity(id)) return;
             var lastEntityId = entities[Count - 1];
@@ -124,123 +222,50 @@ namespace Wargon.ezs
             if (Count > indexOfEntityId)
             {
                 entities[indexOfEntityId] = lastEntityId;
-                entitiesMap[lastEntityId] = indexOfEntityId;
+                entitiesMap.Add(lastEntityId, indexOfEntityId);
             }
-            sparseSet.Remove(id);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal void OnRemoveExclude(int id)
+        public virtual void OnRemoveExclude(int id)
         {
             if (HasEntity(id)) return;
             ref var data = ref world.GetEntityData(id);
-
-            for (var i = 0; i < ExludeCount; i++)
+            for (var i = 0; i < ExcludeCount; i++)
                 if (data.componentTypes.Contains(ExcludeTypes[i]))
                     return;
-            for (var i = 0; i < IncludCount; i++)
-                if (!data.componentTypes.Contains(IncludTypes[i]))
+
+            for (var i = 0; i < IncludeCount; i++)
+                if (!data.componentTypes.Contains(IncludeTypes[i]))
                     return;
 
-            if (entities.Length == Count) Array.Resize(ref entities, entities.Length << 1);
+            if (entities.Length == Count) Array.Resize(ref entities, world.entitiesCount+2);
+            entities[Count] = data.id;
+            entitiesMap.Add(data.id, Count);
+            Count++;
+        }
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal virtual void Add(int id)
+        {
+            if (HasEntity(id)) return;
+            if (entities.Length == Count) Array.Resize(ref entities, world.entitiesCount+2);
             entities[Count] = id;
             entitiesMap.Add(id, Count);
             Count++;
-            sparseSet.Add(id);
+        }
+
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ref Entity GetEntity(int index)
+        {
+            return ref world.GetEntity(entities[index]);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal void Add(Entity entity)
-        {
-            if (entitiesMap.ContainsKey(entity.id)) return;
-            if (entities.Length == Count) Array.Resize(ref entities, entities.Length << 1);
-            entities[Count] = entity.id;
-            entitiesMap.Add(entity.id, Count);
-            Count++;
-            sparseSet.Add(entity.id);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal void Add(int id)
-        {
-            if (entitiesMap.ContainsKey(id)) return;
-            if (entities.Length == Count) Array.Resize(ref entities, entities.Length << 1);
-            entities[Count] = id;
-            entitiesMap.Add(id, Count);
-            Count++;
-            sparseSet.Add(id);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal virtual void Remove(Entity entity)
-        {
-            if (!entitiesMap.ContainsKey(entity.id)) return;
-            var lastEntityId = entities[Count - 1];
-            var indexOfEntityId = entitiesMap[entity.id];
-            entitiesMap.Remove(entity.id);
-            Count--;
-            if (Count > indexOfEntityId)
-            {
-                entities[indexOfEntityId] = lastEntityId;
-                entitiesMap[lastEntityId] = indexOfEntityId;
-            }
-            sparseSet.Remove(entity.id);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal bool HasType<A>()
-        {
-            var typeID = ComponentType<A>.ID;
-            for (int i = 0, iMax = IncludTypes.Length; i < iMax; i++)
-                if (typeID == IncludTypes[i])
-                    return true;
-            return false;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal bool HasType(int typeID)
-        {
-            for (int i = 0, iMax = IncludTypes.Length; i < iMax; i++)
-                if (typeID == IncludTypes[i])
-                    return true;
-            return false;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal bool HasExcludeType<A>()
-        {
-            var typeID = ComponentType<A>.ID;
-            foreach (var t in ExcludeTypes)
-                if (typeID == t)
-                    return true;
-
-            return false;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal bool HasExcludeType(int typeID)
-        {
-            for (var i = 0; i < ExcludeTypes.Length; i++)
-                if (typeID == ExcludeTypes[i])
-                    return true;
-            return false;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public Entity GetEntity(int index)
-        {
-            return world.GetEntity(entities[index]);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal bool HasEntity(int id)
-        {
-            return entitiesMap.ContainsKey(id);
-        }
-
-        internal ref EntityData GetEnitiyDataByIndex(int index)
-        {
-            return ref world.GetEntityData(entities[index]);
+        internal bool HasEntity(int id) {
+            if (Count < 1) return false;
+            return entitiesMap.Has(id);
         }
 
         internal virtual void Clear()
@@ -258,115 +283,117 @@ namespace Wargon.ezs
         {
             return Count < 1;
         }
-        public class WithOut<NA> : EntityType
+        public class WithOut<NA> : EntityType where NA : new()
         {
             public WithOut(World world) : base(world)
             {
-                ExludeCount = 1;
+                ExcludeCount = 1;
                 ExcludeTypes = new[]
                 {
                     ComponentType<NA>.ID
                 };
-                var pool1 = world.GetPool<NA>();
-                pool1.OnAdd += OnAddExclude;
-                pool1.OnRemove += OnRemoveExclude;
+                // var pool1 = world.GetPool<NA>();
+                // pool1.OnAdd += OnAddExclude;
+                // pool1.OnRemove += OnRemoveExclude;
             }
         }
 
-        public class WithOut<NA, NB> : EntityType
+        public class WithOut<NA, NB> : EntityType where NA : new() where NB : new()
         {
             public WithOut(World world) : base(world)
             {
-                ExludeCount = 2;
+                ExcludeCount = 2;
                 ExcludeTypes = new[]
                 {
                     ComponentType<NA>.ID,
                     ComponentType<NB>.ID
                 };
-                var pool1 = world.GetPool<NA>();
-                pool1.OnAdd += OnAddExclude;
-                pool1.OnRemove += OnRemoveExclude;
-                var pool2 = world.GetPool<NB>();
-                pool2.OnAdd += OnAddExclude;
-                pool2.OnRemove += OnRemoveExclude;
+                // var pool1 = world.GetPool<NA>();
+                // pool1.OnAdd += OnAddExclude;
+                // pool1.OnRemove += OnRemoveExclude;
+                // var pool2 = world.GetPool<NB>();
+                // pool2.OnAdd += OnAddExclude;
+                // pool2.OnRemove += OnRemoveExclude;
             }
         }
     }
-
-    public class EntityType<A> : EntityType
+    
+    public class EntityType<A> : EntityType where A : new()
     {
-        internal readonly Pool<A> poolA;
+        internal readonly Pool<A> poolA; 
 
         public EntityType(World world) : base(world)
         {
-            IncludTypes = new[]
+            IncludeTypes = new[]
             {
                 ComponentType<A>.ID
             };
-            IncludCount = 1;
+            IncludeCount = 1;
             poolA = world.GetPool<A>();
             poolA.OnAdd += OnAddInclude;
             poolA.OnRemove += OnRemoveInclude;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public A GetA(int index)
+        internal A GetA(int index)
         {
             return poolA.items[entities[index]];
         }
 
-        public class WithOut<NA> : EntityType<A>
+        public class WithOut<NA> : EntityType<A> where NA : new()
         {
             public WithOut(World world) : base(world)
             {
-                ExludeCount = 1;
+                ExcludeCount = 1;
                 ExcludeTypes = new[]
                 {
                     ComponentType<NA>.ID
                 };
-                var pool1 = world.GetPool<NA>();
-                pool1.OnAdd += OnAddExclude;
-                pool1.OnRemove += OnRemoveExclude;
+                // var pool1 = world.GetPool<NA>();
+                // pool1.OnAdd += OnAddExclude;
+                // pool1.OnRemove += OnRemoveExclude;
+                // pool1.OnAddExclude.Add(this);
+                // pool1.OnRemoveExclude.Add(this);
             }
         }
 
-        public class WithOut<NA, NB> : EntityType<A>
+        public class WithOut<NA, NB> : EntityType<A> where NA : new() where NB : new()
         {
             public WithOut(World world) : base(world)
             {
-                ExludeCount = 2;
+                ExcludeCount = 2;
                 ExcludeTypes = new[]
                 {
                     ComponentType<NA>.ID,
                     ComponentType<NB>.ID
                 };
-                var pool1 = world.GetPool<NA>();
-                pool1.OnAdd += OnAddExclude;
-                pool1.OnRemove += OnRemoveExclude;
-                var pool2 = world.GetPool<NB>();
-                pool2.OnAdd += OnAddExclude;
-                pool2.OnRemove += OnRemoveExclude;
+                // var pool1 = world.GetPool<NA>();
+                // pool1.OnAdd += OnAddExclude;
+                // pool1.OnRemove += OnRemoveExclude;
+                // var pool2 = world.GetPool<NB>();
+                // pool2.OnAdd += OnAddExclude;
+                // pool2.OnRemove += OnRemoveExclude;
             }
         }
     }
 
-    public class EntityType<A, B> : EntityType
+    public class EntityType<A, B> : EntityType  where A: new() where B : new()
     {
         internal readonly Pool<A> poolA;
         internal readonly Pool<B> poolB;
 
         public EntityType(World world) : base(world)
         {
-            IncludTypes = new[]
+            IncludeTypes = new[]
             {
                 ComponentType<A>.ID,
                 ComponentType<B>.ID
             };
-            IncludCount = 2;
-
+            IncludeCount = 2;
+            //
             poolA = world.GetPool<A>();
             poolB = world.GetPool<B>();
-
+            
             poolA.OnAdd += OnAddInclude;
             poolA.OnRemove += OnRemoveInclude;
             poolB.OnAdd += OnAddInclude;
@@ -374,53 +401,53 @@ namespace Wargon.ezs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public A GetA(int index)
+        public ref A GetA(int index)
         {
-            return poolA.items[entities[index]];
+            return ref poolA.items[entities[index]];
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public B GetB(int index)
+        public ref B GetB(int index)
         {
-            return poolB.items[entities[index]];
+            return ref poolB.items[entities[index]];
         }
 
-        public class WithOut<NA> : EntityType<A, B>
+        public class WithOut<NA> : EntityType<A, B> where NA : new()
         {
             public WithOut(World world) : base(world)
             {
-                ExludeCount = 1;
+                ExcludeCount = 1;
                 ExcludeTypes = new[]
                 {
                     ComponentType<NA>.ID
                 };
-                var pool1 = world.GetPool<NA>();
-                pool1.OnAdd += OnAddExclude;
-                pool1.OnRemove += OnRemoveExclude;
+                // var pool1 = world.GetPool<NA>();
+                // pool1.OnAdd += OnAddExclude;
+                // pool1.OnRemove += OnRemoveExclude;
             }
         }
 
-        public class WithOut<NA, NB> : EntityType<A, B>
+        public class WithOut<NA, NB> : EntityType<A, B> where NA : new() where NB : new()
         {
             public WithOut(World world) : base(world)
             {
-                ExludeCount = 2;
+                ExcludeCount = 2;
                 ExcludeTypes = new[]
                 {
                     ComponentType<NA>.ID,
                     ComponentType<NB>.ID
                 };
-                var pool1 = world.GetPool<NA>();
-                pool1.OnAdd += OnAddExclude;
-                pool1.OnRemove += OnRemoveExclude;
-                var pool2 = world.GetPool<NB>();
-                pool2.OnAdd += OnAddExclude;
-                pool2.OnRemove += OnRemoveExclude;
+                // var pool1 = world.GetPool<NA>();
+                // pool1.OnAdd += OnAddExclude;
+                // pool1.OnRemove += OnRemoveExclude;
+                // var pool2 = world.GetPool<NB>();
+                // pool2.OnAdd += OnAddExclude;
+                // pool2.OnRemove += OnRemoveExclude;
             }
         }
     }
 
-    public class EntityType<A, B, C> : EntityType
+    public class EntityType<A, B, C> : EntityType  where A: new() where B : new() where C : new()
     {
         internal readonly Pool<A> poolA;
         internal readonly Pool<B> poolB;
@@ -428,13 +455,13 @@ namespace Wargon.ezs
 
         public EntityType(World world) : base(world)
         {
-            IncludTypes = new[]
+            IncludeTypes = new[]
             {
                 ComponentType<A>.ID,
                 ComponentType<B>.ID,
                 ComponentType<C>.ID
             };
-            IncludCount = 3;
+            IncludeCount = 3;
             poolA = world.GetPool<A>();
             poolB = world.GetPool<B>();
             poolС = world.GetPool<C>();
@@ -465,42 +492,42 @@ namespace Wargon.ezs
             return poolС.items[entities[index]];
         }
 
-        public class Without<NA> : EntityType<A, B, C>
+        public class Without<NA> : EntityType<A, B, C> where NA : new()
         {
             public Without(World world) : base(world)
             {
-                ExludeCount = 1;
+                ExcludeCount = 1;
                 ExcludeTypes = new[]
                 {
                     ComponentType<NA>.ID
                 };
-                var pool1 = world.GetPool<NA>();
-                pool1.OnAdd += OnAddExclude;
-                pool1.OnRemove += OnRemoveExclude;
+                // var pool1 = world.GetPool<NA>();
+                // pool1.OnAdd += OnAddExclude;
+                // pool1.OnRemove += OnRemoveExclude;
             }
         }
 
-        public class Without<NA, NB> : EntityType<A, B, C>
+        public class Without<NA, NB> : EntityType<A, B, C> where NA : new() where NB : new()
         {
             public Without(World world) : base(world)
             {
-                ExludeCount = 2;
+                ExcludeCount = 2;
                 ExcludeTypes = new[]
                 {
                     ComponentType<NA>.ID,
                     ComponentType<NB>.ID
                 };
-                var pool1 = world.GetPool<NA>();
-                pool1.OnAdd += OnAddExclude;
-                pool1.OnRemove += OnRemoveExclude;
-                var pool2 = world.GetPool<NB>();
-                pool2.OnAdd += OnAddExclude;
-                pool2.OnRemove += OnRemoveExclude;
+                // var pool1 = world.GetPool<NA>();
+                // pool1.OnAdd += OnAddExclude;
+                // pool1.OnRemove += OnRemoveExclude;
+                // var pool2 = world.GetPool<NB>();
+                // pool2.OnAdd += OnAddExclude;
+                // pool2.OnRemove += OnRemoveExclude;
             }
         }
     }
 
-    public class EntityType<A, B, C, D> : EntityType
+    public class EntityType<A, B, C, D> : EntityType  where A: new() where B : new() where C : new() where D : new()
     {
         internal readonly Pool<A> poolA;
         internal readonly Pool<B> poolB;
@@ -509,14 +536,14 @@ namespace Wargon.ezs
 
         public EntityType(World world) : base(world)
         {
-            IncludTypes = new[]
+            IncludeTypes = new[]
             {
                 ComponentType<A>.ID,
                 ComponentType<B>.ID,
                 ComponentType<C>.ID,
                 ComponentType<D>.ID
             };
-            IncludCount = 4;
+            IncludeCount = 4;
             poolA = world.GetPool<A>();
             poolB = world.GetPool<B>();
             poolС = world.GetPool<C>();
@@ -556,42 +583,42 @@ namespace Wargon.ezs
             return poolD.items[entities[index]];
         }
 
-        public class WithOut<NA> : EntityType<A, B, C, D>
+        public class WithOut<NA> : EntityType<A, B, C, D> where NA : new()
         {
             public WithOut(World world) : base(world)
             {
-                ExludeCount = 1;
+                ExcludeCount = 1;
                 ExcludeTypes = new[]
                 {
                     ComponentType<NA>.ID
                 };
-                var pool1 = world.GetPool<NA>();
-                pool1.OnAdd += OnAddExclude;
-                pool1.OnRemove += OnRemoveExclude;
+                // var pool1 = world.GetPool<NA>();
+                // pool1.OnAdd += OnAddExclude;
+                // pool1.OnRemove += OnRemoveExclude;
             }
         }
 
-        public class WithOut<NA, NB> : EntityType<A, B, C, D>
+        public class WithOut<NA, NB> : EntityType<A, B, C, D> where NA : new() where NB : new()
         {
             public WithOut(World world) : base(world)
             {
-                ExludeCount = 2;
+                ExcludeCount = 2;
                 ExcludeTypes = new[]
                 {
                     ComponentType<NA>.ID,
                     ComponentType<NB>.ID
                 };
-                var pool1 = world.GetPool<NA>();
-                pool1.OnAdd += OnAddExclude;
-                pool1.OnRemove += OnRemoveExclude;
-                var pool2 = world.GetPool<NB>();
-                pool2.OnAdd += OnAddExclude;
-                pool2.OnRemove += OnRemoveExclude;
+                // var pool1 = world.GetPool<NA>();
+                // pool1.OnAdd += OnAddExclude;
+                // pool1.OnRemove += OnRemoveExclude;
+                // var pool2 = world.GetPool<NB>();
+                // pool2.OnAdd += OnAddExclude;
+                // pool2.OnRemove += OnRemoveExclude;
             }
         }
     }
 
-    public class EntityType<A, B, C, D, E> : EntityType
+    public class EntityType<A, B, C, D, E> : EntityType where A: new() where B : new() where C : new() where D : new() where  E : new()
     {
         internal readonly Pool<A> poolA;
         internal readonly Pool<B> poolB;
@@ -601,7 +628,7 @@ namespace Wargon.ezs
 
         public EntityType(World world) : base(world)
         {
-            IncludTypes = new[]
+            IncludeTypes = new[]
             {
                 ComponentType<A>.ID,
                 ComponentType<B>.ID,
@@ -609,7 +636,7 @@ namespace Wargon.ezs
                 ComponentType<D>.ID,
                 ComponentType<E>.ID
             };
-            IncludCount = 5;
+            IncludeCount = 5;
             poolA = world.GetPool<A>();
             poolB = world.GetPool<B>();
             poolС = world.GetPool<C>();
@@ -658,42 +685,42 @@ namespace Wargon.ezs
             return poolE.items[entities[index]];
         }
 
-        public class WithOut<NA> : EntityType<A, B, C, D, E>
+        public class WithOut<NA> : EntityType<A, B, C, D, E> where NA : new()
         {
             public WithOut(World world) : base(world)
             {
-                ExludeCount = 1;
+                ExcludeCount = 1;
                 ExcludeTypes = new[]
                 {
                     ComponentType<NA>.ID
                 };
-                var pool1 = world.GetPool<NA>();
-                pool1.OnAdd += OnAddExclude;
-                pool1.OnRemove += OnRemoveExclude;
+                // var pool1 = world.GetPool<NA>();
+                // pool1.OnAdd += OnAddExclude;
+                // pool1.OnRemove += OnRemoveExclude;
             }
         }
 
-        public class WithOut<NA, NB> : EntityType<A, B, C, D, E>
+        public class WithOut<NA, NB> : EntityType<A, B, C, D, E> where NA : new() where NB : new()
         {
             public WithOut(World world) : base(world)
             {
-                ExludeCount = 2;
+                ExcludeCount = 2;
                 ExcludeTypes = new[]
                 {
                     ComponentType<NA>.ID,
                     ComponentType<NB>.ID
                 };
-                var pool1 = world.GetPool<NA>();
-                pool1.OnAdd += OnAddExclude;
-                pool1.OnRemove += OnRemoveExclude;
-                var pool2 = world.GetPool<NB>();
-                pool2.OnAdd += OnAddExclude;
-                pool2.OnRemove += OnRemoveExclude;
+                // var pool1 = world.GetPool<NA>();
+                // pool1.OnAdd += OnAddExclude;
+                // pool1.OnRemove += OnRemoveExclude;
+                // var pool2 = world.GetPool<NB>();
+                // pool2.OnAdd += OnAddExclude;
+                // pool2.OnRemove += OnRemoveExclude;
             }
         }
     }
 
-    public class EntityType<A, B, C, D, E, F> : EntityType
+    public class EntityType<A, B, C, D, E, F> : EntityType where A: new() where B : new() where C : new() where D : new() where  E : new() where  F : new()
     {
         internal readonly Pool<A> poolA;
         internal readonly Pool<B> poolB;
@@ -704,7 +731,7 @@ namespace Wargon.ezs
 
         public EntityType(World world) : base(world)
         {
-            IncludTypes = new[]
+            IncludeTypes = new[]
             {
                 ComponentType<A>.ID,
                 ComponentType<B>.ID,
@@ -713,7 +740,7 @@ namespace Wargon.ezs
                 ComponentType<E>.ID,
                 ComponentType<F>.ID
             };
-            IncludCount = 6;
+            IncludeCount = 6;
             poolA = world.GetPool<A>();
             poolB = world.GetPool<B>();
             poolС = world.GetPool<C>();
@@ -771,42 +798,42 @@ namespace Wargon.ezs
             return poolF.items[entities[index]];
         }
 
-        public class WithOut<NA> : EntityType<A, B, C, D, E, F>
+        public class WithOut<NA> : EntityType<A, B, C, D, E, F> where NA : new()
         {
             public WithOut(World world) : base(world)
             {
-                ExludeCount = 1;
+                ExcludeCount = 1;
                 ExcludeTypes = new[]
                 {
                     ComponentType<NA>.ID
                 };
-                var pool1 = world.GetPool<NA>();
-                pool1.OnAdd += OnAddExclude;
-                pool1.OnRemove += OnRemoveExclude;
+                // var pool1 = world.GetPool<NA>();
+                // pool1.OnAdd += OnAddExclude;
+                // pool1.OnRemove += OnRemoveExclude;
             }
         }
 
-        public class WithOut<NA, NB> : EntityType<A, B, C, D, E, F>
+        public class WithOut<NA, NB> : EntityType<A, B, C, D, E, F> where NA : new() where NB : new()
         {
             public WithOut(World world) : base(world)
             {
-                ExludeCount = 2;
+                ExcludeCount = 2;
                 ExcludeTypes = new[]
                 {
                     ComponentType<NA>.ID,
                     ComponentType<NB>.ID
                 };
-                var pool1 = world.GetPool<NA>();
-                pool1.OnAdd += OnAddExclude;
-                pool1.OnRemove += OnRemoveExclude;
-                var pool2 = world.GetPool<NB>();
-                pool2.OnAdd += OnAddExclude;
-                pool2.OnRemove += OnRemoveExclude;
+                // var pool1 = world.GetPool<NA>();
+                // pool1.OnAdd += OnAddExclude;
+                // pool1.OnRemove += OnRemoveExclude;
+                // var pool2 = world.GetPool<NB>();
+                // pool2.OnAdd += OnAddExclude;
+                // pool2.OnRemove += OnRemoveExclude;
             }
         }
     }
 
-    public class EntityType<A, B, C, D, E, F, G> : EntityType
+    public class EntityType<A, B, C, D, E, F, G> : EntityType  where A: new() where B : new() where C : new() where D : new() where  E : new() where  F : new() where G : new()
     {
         internal readonly Pool<A> poolA;
         internal readonly Pool<B> poolB;
@@ -818,7 +845,7 @@ namespace Wargon.ezs
 
         public EntityType(World world) : base(world)
         {
-            IncludTypes = new[]
+            IncludeTypes = new[]
             {
                 ComponentType<A>.ID,
                 ComponentType<B>.ID,
@@ -828,7 +855,7 @@ namespace Wargon.ezs
                 ComponentType<F>.ID,
                 ComponentType<G>.ID
             };
-            IncludCount = 6;
+            IncludeCount = 7;
             poolA = world.GetPool<A>();
             poolB = world.GetPool<B>();
             poolС = world.GetPool<C>();
@@ -896,37 +923,38 @@ namespace Wargon.ezs
             return poolG.items[entities[index]];
         }
 
-        public class WithOut<NA> : EntityType<A, B, C, D, E, F, G>
+        public class WithOut<NA> : EntityType<A, B, C, D, E, F, G> where NA : new()
         {
             public WithOut(World world) : base(world)
             {
-                ExludeCount = 1;
+                ExcludeCount = 1;
                 ExcludeTypes = new[]
                 {
                     ComponentType<NA>.ID
                 };
-                var pool1 = world.GetPool<NA>();
-                pool1.OnAdd += OnAddExclude;
-                pool1.OnRemove += OnRemoveExclude;
+                // var pool1 = world.GetPool<NA>();
+                // pool1.OnAdd += OnAddExclude;
+                // pool1.OnRemove += OnRemoveExclude;
             }
         }
 
-        public class WithOut<NA, NB> : EntityType<A, B, C, D, E, F, G>
+        public class WithOut<NA, NB> : EntityType<A, B, C, D, E, F, G> where NA : new() where NB : new()
         {
             public WithOut(World world) : base(world)
             {
-                ExludeCount = 2;
+                ExcludeCount = 2;
                 ExcludeTypes = new[]
                 {
                     ComponentType<NA>.ID,
                     ComponentType<NB>.ID
                 };
-                var pool1 = world.GetPool<NA>();
-                pool1.OnAdd += OnAddExclude;
-                pool1.OnRemove += OnRemoveExclude;
-                var pool2 = world.GetPool<NB>();
-                pool2.OnAdd += OnAddExclude;
-                pool2.OnRemove += OnRemoveExclude;
+                // var pool1 = world.GetPool<NA>();
+                // pool1.OnAdd += OnAddExclude;
+                // pool1.OnRemove += OnRemoveExclude;
+                // var pool2 = world.GetPool<NB>();
+                // pool2.OnAdd += OnAddExclude;
+                // pool2.OnRemove += OnRemoveExclude;
+
             }
         }
     }
@@ -1045,4 +1073,126 @@ namespace Wargon.ezs
             return GetEnumerator();
         }
     }
+    
+    public class OwnerQuery : EntityType
+{
+    private int ownerID;
+    private readonly Pool<Owner> pool;
+    
+    public OwnerQuery(World world) : base(world)
+    {
+        ExcludeCount = 0;
+        IncludeCount = 0;
+        IncludeTypes = new int[8];
+        ExcludeTypes = new int[4];
+        pool = world.GetPool<Owner>();
+        IncludeTypes[IncludeCount] = pool.TypeID;
+        pool.OnAdd += OnAddInclude;
+        pool.OnRemove += OnRemoveInclude;
+        IncludeCount++;
+    }
+    public OwnerQuery WithOwner(int id)
+    {
+        ownerID = id;
+        return this;
+    }
+    public OwnerQuery With<T>() where T : new()
+    {
+        IncludeTypes[IncludeCount] = ComponentType<T>.ID;
+        world.GetPool<T>().OnAdd += OnAddInclude;
+        world.GetPool<T>().OnRemove += OnRemoveInclude;
+        IncludeCount++;
+        return this;
+    }
+    public OwnerQuery Without<T>() where T : new()
+    {
+        ExcludeTypes[ExcludeCount] = ComponentType<T>.ID;
+        world.GetPool<T>().OnAdd += OnAddExclude;
+        world.GetPool<T>().OnRemove += OnRemoveExclude;
+        ExcludeCount++;
+        return this;
+    }
+    public Entity GetOwner()
+    {
+        return world.GetEntity(ownerID);
+    }
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal override void Add(int id)
+    {
+        if (HasEntity(id)) return;
+        if(pool.items[id].value.id != ownerID) return;
+        if (entities.Length == Count) Array.Resize(ref entities, world.entitiesCount+2);
+        entities[Count] = id;
+        entitiesMap.Add(id, Count);
+        Count++;
+    }
+    private new void OnAddInclude(int id)
+    {
+        if (HasEntity(id)) return;
+        
+        ref var data = ref world.GetEntityData(id);
+        for (var i = 0; i < ExcludeCount; i++)
+            if (data.componentTypes.Contains(ExcludeTypes[i]))
+                return;
+
+        for (var i = 0; i < IncludeCount; i++)
+            if (!data.componentTypes.Contains(IncludeTypes[i]))
+                return;
+        if(pool.items[id].value.id != ownerID) return;
+        if (entities.Length == Count) Array.Resize(ref entities, world.entitiesCount+2);
+        entities[Count] = data.id;
+        entitiesMap.Add(data.id, Count);
+        Count++;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private new void OnRemoveInclude(int id)
+    {
+        if (!HasEntity(id)) return;
+        var lastEntityId = entities[Count - 1];
+        var indexOfEntityId = entitiesMap[id];
+        entitiesMap.Remove(id);
+        Count--;
+        if (Count > indexOfEntityId)
+        {
+            entities[indexOfEntityId] = lastEntityId;
+            entitiesMap.Add(lastEntityId, indexOfEntityId);
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private new void OnAddExclude(int id)
+    {
+        if (!HasEntity(id)) return;
+        var lastEntityId = entities[Count - 1];
+        var indexOfEntityId = entitiesMap[id];
+        entitiesMap.Remove(id);
+        Count--;
+        if (Count > indexOfEntityId)
+        {
+            entities[indexOfEntityId] = lastEntityId;
+            entitiesMap.Add(lastEntityId, indexOfEntityId);
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private new void OnRemoveExclude(int id)
+    {
+        if (HasEntity(id)) return;
+        
+        ref var data = ref world.GetEntityData(id);
+        for (var i = 0; i < ExcludeCount; i++)
+            if (data.componentTypes.Contains(ExcludeTypes[i]))
+                return;
+
+        for (var i = 0; i < IncludeCount; i++)
+            if (!data.componentTypes.Contains(IncludeTypes[i]))
+                return;
+        if(pool.items[id].value.id != ownerID) return;
+        if (entities.Length == Count) Array.Resize(ref entities, world.entitiesCount+2);
+        entities[Count] = data.id;
+        entitiesMap.Add(data.id, Count);
+        Count++;
+    }
+}
 }

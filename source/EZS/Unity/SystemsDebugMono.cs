@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Diagnostics;
+using System.Runtime.CompilerServices;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using Wargon.ezs;
@@ -21,6 +22,7 @@ namespace Wargon.ezs.Unity
         public int index;
         public double executeTime;
         public readonly double[] executeTimes;
+        public readonly bool[] active;
         private readonly Stopwatch stopwatch;
         private readonly Stopwatch[] stopwatches;
         
@@ -29,7 +31,7 @@ namespace Wargon.ezs.Unity
             Systems = systems;
             //Systems.SetListener(this);
             var newDebugMono = new GameObject().AddComponent<SystemsDebugMono>();
-            world.SubOnDestoy(() =>
+            world.SubOnDestroy(() =>
             {
                 if(newDebugMono)
                     Object.Destroy(newDebugMono.gameObject);
@@ -41,31 +43,38 @@ namespace Wargon.ezs.Unity
             newDebugMono.transform.SetSiblingIndex(0);
             stopwatch = new Stopwatch();
             stopwatches = new Stopwatch[systems.updateSystemsList.Count];
-            for (var i = 0; i < stopwatches.Length; i++)
+            active = new bool[systems.updateSystemsList.Count];
+            for (var i = 0; i < stopwatches.Length; i++) {
                 stopwatches[i] = new Stopwatch();
+                active[i] = true;
+            }
             executeTimes = new double[systems.updateSystemsList.Count];
         }
 
         public Systems Systems { get; }
-
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool Active(int index) {
+            return active[index];
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void StartCheck()
         {
             stopwatch.Reset();
             stopwatch.Start();
         }
-
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void StopCheck()
         {
             stopwatch.Stop();
             executeTime = stopwatch.Elapsed.TotalMilliseconds;
         }
-
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void StartCheck(int index)
         {
             stopwatches[index].Reset();
             stopwatches[index].Start();
         }
-
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void StopCheck(int index)
         {
             stopwatches[index].Stop();

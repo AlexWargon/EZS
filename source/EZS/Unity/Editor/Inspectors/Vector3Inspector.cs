@@ -5,7 +5,7 @@ namespace Wargon.ezs.Unity
 {
     public class Vector3Inspector : TypeInspector<Vector3>
     {
-        public override object DrawCollectionElement(Rect rect, object element)
+        public override object DrawCollectionElement(Rect rect, object element, int index)
         {
             return EditorGUI.Vector3Field(rect, $"element [1]", (Vector3)element);
         }

@@ -12,30 +12,9 @@ namespace Wargon.ezs.Unity
         
         static EzsDebugConfigs()
         {
-            //Debug.Log("RELOADED");
-            
+            Debug.Log("RELOADED");
             ComponentTypesList.Init();
-            ComponentInspector.Init();
-        }
-    }
-    [CreateAssetMenu(fileName = "EzsDebugStyles", menuName = "EZS/EzsDebugStyles", order = 1)]
-    public class EzsDebugStyles : ScriptableObject
-    {
-        public List<Context> styles;
-        private static EzsDebugStyles instance;
-        public static EzsDebugStyles Isntance
-        {
-            get
-            {
-                if (instance == null)
-                {
-                    EzsDebugStyles[] results = Resources.FindObjectsOfTypeAll<EzsDebugStyles>();
-                    instance = results[0];
-                    instance.hideFlags = HideFlags.DontUnloadUnusedAsset;
-                }
-
-                return instance;
-            }
+            ComponentInspectorInternal.Init();
         }
     }
     [Serializable]

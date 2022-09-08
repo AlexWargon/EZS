@@ -5,7 +5,7 @@ namespace Wargon.ezs.Unity
 {
     public class Vector4Inspector : TypeInspector<Vector4>
     {
-        public override object DrawCollectionElement(Rect rect, object element)
+        public override object DrawCollectionElement(Rect rect, object element, int index)
         {
             throw new System.NotImplementedException();
         }

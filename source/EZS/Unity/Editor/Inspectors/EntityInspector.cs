@@ -5,7 +5,7 @@ namespace Wargon.ezs.Unity
 {
     public class EntityInspector : TypeInspector<Entity>
     {
-        public override object DrawCollectionElement(Rect rect, object element)
+        public override object DrawCollectionElement(Rect rect, object element, int index)
         {
             throw new System.NotImplementedException();
         }
@@ -14,7 +14,7 @@ namespace Wargon.ezs.Unity
         {
             EditorGUILayout.BeginVertical();
 
-            if (field.IsDead() || field.world == null)
+            if (field.IsNULL() || field.World == null)
             {
                 EditorGUILayout.LabelField($"    {fieldName} : NULL ENTITY");
                 EditorGUILayout.EndVertical();

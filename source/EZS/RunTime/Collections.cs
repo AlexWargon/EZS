@@ -1,8 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq.Expressions;
 using System.Runtime.CompilerServices;
 using System.Threading;
+using Unity.Burst;
+using UnityEngine;
 
 namespace Wargon.ezs
 {
@@ -13,34 +14,108 @@ namespace Wargon.ezs
         void Clear();
     }
     
-    [Serializable]
-    public class Pool<T> : IPool
+    // [Il2CppSetOption(Option.NullChecks, false)]
+    // [Il2CppSetOption(Option.ArrayBoundsChecks, false)]
+    // [Il2CppSetOption(Option.DivideByZeroChecks, false)]
+
+    public struct Observers {
+        public EntityType[] observers;
+        public int count;
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Add(EntityType entityType) {
+            if (observers.Length <= count) {
+                Array.Resize(ref observers, observers.Length<<1);
+            }
+            observers[count] = entityType;
+            count++;
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void OnAddInclude(int id) {
+            for (var i = 0; i < count; i++) {
+                observers[i].OnAddInclude(id);
+            }
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void OnRemoveInclude(int id) {
+            for (var i = 0; i < count; i++) {
+                observers[i].OnRemoveInclude(id);
+            }
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void OnAddExclude(int id) {
+            for (var i = 0; i < count; i++) {
+                observers[i].OnAddExclude(id);
+            }
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void OnRemoveExclude(int id) {
+            for (var i = 0; i < count; i++) {
+                observers[i].OnRemoveExclude(id);
+            }
+        }
+    }
+    
+    public class Pool<T> : IPool where T : new()
     {
         public T[] items;
         public int length;
+        private bool typeIsStruct;
+        public event Action<int> OnRemove;
+        public event Action<int> OnAdd;
 
-        public Pool(int size)
-        {
+        private bool isTag;
+        // public Observers OnAddExclude;
+        // public Observers OnAddInclude;
+        // public Observers OnRemoveExclude;
+        // public Observers OnRemoveInclude;
+        
+        public Pool(int size) {
+            isTag = ComponentType<T>.IsTag;
             items = new T[size];
             ItemType = typeof(T);
             TypeID = ComponentType<T>.ID;
+            typeIsStruct = ComponentType<T>.IsStruct;
             length = size;
+            // OnAddExclude = new Observers {
+            //     observers = new EntityType[4],
+            //     count = 0
+            // };
+            // OnAddInclude = new Observers {
+            //     observers = new EntityType[4],
+            //     count = 0
+            // };
+            // OnRemoveExclude = new Observers {
+            //     observers = new EntityType[4],
+            //     count = 0
+            // };
+            // OnRemoveInclude = new Observers {
+            //     observers = new EntityType[4],
+            //     count = 0
+            // };
         }
 
         public int TypeID { get; }
+        public int Count { get; set; }
         public Type ItemType { get; }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Remove(int entity)
         {
             OnRemove?.Invoke(entity);
-            items[entity] = default;
+            // OnRemoveExclude.OnRemoveExclude(entity);
+            // OnRemoveInclude.OnRemoveInclude(entity);
+            Count--;
+            Default(entity);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Add(int entity)
         {
             OnAdd?.Invoke(entity);
+            // OnAddExclude.OnAddExclude(entity);
+            // OnAddInclude.OnAddInclude(entity);
+            Count++;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -51,8 +126,11 @@ namespace Wargon.ezs
                 Array.Resize(ref items, id + 16);
                 length = items.Length;
             }
-
-            items[id] = (T) Activator.CreateInstance(typeof(T));
+            if (typeIsStruct) {
+                items[id] = default;
+            }
+            else
+                items[id] = new T();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -63,7 +141,9 @@ namespace Wargon.ezs
                 length = items.Length;
             }
 
-            items[id] ??= (T) Activator.CreateInstance(typeof(T));
+            if (!typeIsStruct) {
+                items[id] = new T();
+            }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -73,7 +153,7 @@ namespace Wargon.ezs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        void IPool.Set(object component, int id)
+        void IPool.SetBoxed(object component, int id)
         {
             if (length - 1 < id)
             {
@@ -86,21 +166,14 @@ namespace Wargon.ezs
             items[id] = (T)component;
         }
 
-        public event Action<int> OnRemove;
-        public event Action<int> OnAdd;
-
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Set(T component, int id)
         {
             if (length - 1 < id)
             {
-                // var dif = length > id ? length - id : id - length;
-                // Array.Resize(ref items, 1 + length + dif);
-                // length = items.Length;
                 Array.Resize(ref items, id + 16);
                 length = items.Length;
             }
-
             items[id] = component;
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -108,9 +181,6 @@ namespace Wargon.ezs
         {
             if (length - 1 < id)
             {
-                // var dif = length > id ? length - id : id - length;
-                // Array.Resize(ref items, 1 + length + dif);
-                // length = items.Length;
                 Array.Resize(ref items, id + 16);
                 length = items.Length;
             }
@@ -130,9 +200,11 @@ namespace Wargon.ezs
         int IPool.GetSize() => length;
     }
 
-    public interface IPool
-    {
+    public interface IPool {
+        event Action<int> OnAdd;
+        event Action<int> OnRemove;
         int TypeID { get; }
+        int Count { get; set; }
         Type ItemType { get; }
 
         /// <summary>
@@ -148,7 +220,7 @@ namespace Wargon.ezs
         /// <summary>
         ///     <para>Set boxed component to pool (NEED FOR UNITY EXTENSION)</para>
         /// </summary>
-        void Set(object component, int id);
+        void SetBoxed(object component, int id);
 
         /// <summary>
         ///     <para>Set boxed component to pool (NEED FOR UNITY EXTENSION)</para>
@@ -160,58 +232,7 @@ namespace Wargon.ezs
         int GetSize();
     }
 
-    public struct TypeMap<TKey, TValue>
-    {
-        private readonly Dictionary<TKey, int> indexMap;
-        public readonly GrowList<TValue> Values;
-        public int Count => Values.Count;
-
-        public TValue this[TKey key]
-        {
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get => Values[indexMap[key]];
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public TypeMap(int size)
-        {
-            indexMap = new Dictionary<TKey, int>();
-            Values = new GrowList<TValue>(size);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Add(TKey key, TValue item)
-        {
-            if (indexMap.ContainsKey(key)) return;
-            indexMap.Add(key, Values.Count);
-            Values.Add(item);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool HasKey(TKey key)
-        {
-            return indexMap.ContainsKey(key);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public TValue Get(TKey key)
-        {
-            return Values.Items[indexMap[key]];
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Clear()
-        {
-            Array.Clear(Values.Items, 0, Values.Items.Length);
-            indexMap.Clear();
-        }
-    }
-
-    public interface IGrowList
-    {
-    }
-
-    public class GrowList<T> : IGrowList
+    public class GrowList<T>
     {
         public int Count;
         public T[] Items;
@@ -223,7 +244,13 @@ namespace Wargon.ezs
             Count = 0;
         }
 
-        public T this[int index] => Items[index];
+        public T this[int index]
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get => Items[index];
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            set => Items[index] = value;
+        }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal void Add(T item)
@@ -265,13 +292,20 @@ namespace Wargon.ezs
     }
 
 
-    public static class ComponentType<T>
+    public struct ComponentType<T>
     {
+        // ReSharper disable once StaticMemberInGenericType
         public readonly static int ID;
-
+        // ReSharper disable once StaticMemberInGenericType
+        public readonly static bool IsStruct;
+        // ReSharper disable once StaticMemberInGenericType
+        public readonly static bool IsUnmanaged;
+        // ReSharper disable once StaticMemberInGenericType
+        public readonly static bool IsTag;
         static ComponentType()
         {
             var Value = typeof(T);
+            IsTag = Value.GetFields().Length < 1;
             if (ComponentTypeMap.Has(Value))
             {
                 ID = ComponentTypeMap.GetID(Value);
@@ -279,47 +313,36 @@ namespace Wargon.ezs
             else
             {
                 ID = Interlocked.Increment(ref ComponentTypes.Count);
-                ComponentTypeMap.Add<T>(Value, ID);
+                ComponentTypeMap.Add(Value, ID);
             }
+
+            IsStruct = Value.IsValueType;
         }
     }
 
+    [EcsComponent]
+    public struct TransformRef
+    {
+        public UnityEngine.Transform Value;
+    }
     public static class ComponentTypes
     {
         internal static int Count;
-    }
-
-    internal static class CustomPoolsCount
-    {
-        public static int Value;
-    }
-    internal static class CustomPoolID<T>
-    {
-        public static int Value;
-        static CustomPoolID()
-        {
-            Value = CustomPoolsCount.Value++;
-        }
     }
     
     public static class ComponentTypeMap
     {
         private static Dictionary<Type, int> TypeID;
         private static Dictionary<int, Type> TypeValue;
-        private static World World;
         private static bool inited;
 
-        public static void Init(World world)
-        {
-            if (inited) return;
-            World = world;
+        static ComponentTypeMap() {
             TypeID = new Dictionary<Type, int>();
             TypeValue = new Dictionary<int, Type>();
-            inited = true;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void Add<A>(Type type, int id)
+        public static void Add(Type type, int id)
         {
             if (TypeID.ContainsKey(type)) return;
             TypeID.Add(type, id);
@@ -344,41 +367,23 @@ namespace Wargon.ezs
 
             return TypeID[type];
         }
-
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Type GetTypeByID(int id)
         {
             return TypeValue[id];
         }
-        
-        
-        
     }
-
-    public static class Component<T>
-    {
-        private static readonly Func<T> fastActivator;
-
-        static Component()
-        {
-            fastActivator = FastActivator.Generate<T>();
-        }
-
-        public static T New()
-        {
-            return fastActivator();
-        }
-    }
-    internal static class TypePair<T1, T2>
+    
+    internal struct TypePair<T1, T2>
     { 
         internal static int Id;
         static TypePair()
         {
-            Id = Counts<T1>.Value++;
+            Id = TypePairCount<T1>.Value++;
         }
     }
 
-    internal static class Counts<T1>
+    internal struct TypePairCount<T1>
     {
         internal static int Value;
     }
@@ -395,7 +400,15 @@ namespace Wargon.ezs
                 Array.Resize(ref actives, newL);
             }
         }
-        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void ValidateArray<T>(ref T[] array, int id)
+        {
+            if (array.Length == id - 1)
+            {
+                var newL = array.Length + 16;
+                Array.Resize(ref array, newL);
+            }
+        }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void ValidateEntities(ref Entities[] array, ref bool[] actives, int id)
         {
@@ -406,17 +419,88 @@ namespace Wargon.ezs
                 Array.Resize(ref actives, newL);
             }
         }
-    }
-    public static class FastActivator
-    {
-        public static Func<TResult> Generate<TResult>()
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void ValidateEntityTypes(ref fEntities[] array, ref bool[] actives, int id)
         {
-            var constructorInfo = typeof(TResult).GetConstructor(Type.EmptyTypes);
+            if (array.Length == id - 1)
+            {
+                var newL = array.Length + 16;
+                Array.Resize(ref array, newL);
+                Array.Resize(ref actives, newL);
+            }
+        }
+    }
 
-            var expression = Expression.Lambda<Func<TResult>>(
-                Expression.New(constructorInfo, null), null);
-            var functor = expression.Compile();
-            return functor;
+    internal class IntKeyMap<TItem> {
+        private TItem[] items;
+        private int[] keys;
+        public int Capacity;
+        public int Count;
+        public ref TItem this[int key] {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get => ref items[keys[key]];
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void Assert(int key) {
+            if (Capacity <= key) {
+                Resize(key + 16);
+            }
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void Resize(int newSize) {
+            Array.Resize(ref items, newSize);
+            Capacity = newSize;
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Add(int key, TItem value) {
+            Assert(key);
+            keys[Count] = key;
+            items[key] = value;
+        }
+    }
+    
+    internal class IntMap {
+        private int[] items;
+        public int Capacity;
+
+        public int this[int key] {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get => items[key] - 1;
+        }
+        public IntMap(int capacity) {
+            items = new int[capacity];
+            Capacity = capacity;
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void Resize(int newSize) {
+            Array.Resize(ref items, newSize);
+            Capacity = newSize;
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void Assert(int key) {
+            if (Capacity <= key) {
+                Resize(key + 16);
+            }
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Add(int key, int value) {
+            Assert(key);
+            items[key] = value + 1;
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public int Get(int key) {
+            return items[key] - 1;
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Remove(int key) {
+            Assert(key);
+            items[key] = 0;
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool Has(int key) {
+            return Capacity > key && items[key] != 0;
         }
     }
 }

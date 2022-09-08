@@ -8,7 +8,7 @@ namespace Wargon.ezs.Unity
     [CustomEditor(typeof(SystemsDebugMono))]
     public class SystemsDebugInspector : Editor
     {
-        private const int SYSTEM_MONITOR_DATA_LENGTH = 50;
+        private const int SYSTEM_MONITOR_DATA_LENGTH = 40;
         private static bool showSystemsMonitor = true;
         private int lastRenderedFrameCount;
         private GUIContent pauseButtonContent;
@@ -55,7 +55,12 @@ namespace Wargon.ezs.Unity
                 systemMonitorData = new Queue<float>(new float[SYSTEM_MONITOR_DATA_LENGTH]);
             }
 
-            if (systemViews == null) systemViews = new SystemView[systemsDebug.Systems.updateSystemsList.Count];
+            if (systemViews == null) {
+                systemViews = new SystemView[systemsDebug.Systems.updateSystemsList.Count];
+                for (var i = 0; i < systemViews.Length; i++) {
+                    systemViews[i].tenTimes = new Queue<double>();
+                }
+            }
 
             EditorGUILayout.BeginHorizontal();
             EditorGUILayout.BeginVertical();
@@ -78,43 +83,44 @@ namespace Wargon.ezs.Unity
             EditorGUILayout.LabelField("time ms:  | max time ms:");
             EditorGUILayout.EndHorizontal();
 
-            //var iJobSystemInteraceTag = typeof(IJobSystemTag);
+
             var burstSystemsStyle = new GUIStyle(EditorStyles.textField);
             burstSystemsStyle.normal.textColor = new Color(1f, 0.46f, 0f);
-
+            
             for (var i = 0; i < systemViews.Length; i++)
             {
-                var system = systemViews[i];
+                ref var system = ref systemViews[i];
                 var systemType = systemsDebug.Systems.updateSystemsList[i].GetType();
                 system.name = systemType.Name;
-                system.time = systemsDebug.executeTimes[i];
-                
+                system.timems = systemsDebug.executeTimes[i];
+                system.SetNewTime(system.timems);
                 EditorGUILayout.BeginHorizontal(GUI.skin.box);
 
                 if (systemType.IsDefined(typeof(SystemColorAttribute), false)) {
-                    DrawSystemWithColor(systemType, system);
+                    systemsDebug.active[i] = EditorGUILayout.Toggle(systemsDebug.active[i]);
+                    DrawSystemWithColor(systemType, ref system);
                 }
                 else
                 {
+                    systemsDebug.active[i] = EditorGUILayout.Toggle(systemsDebug.active[i]);
                     EditorGUILayout.LabelField(system.name);
-                    EditorGUILayout.LabelField($"{(system.time > 0.002 ? system.time : 0.000): 0.000} ms");
+                    EditorGUILayout.LabelField($"{(system.timems/* > 0.002 ? system.time : 0.000*/): 0.000} ms, av {system.GetAvarage() : 0.000} ms");
                 }
 
                 EditorGUILayout.EndHorizontal();
             }
         }
 
-        private static void DrawSystemWithColor(Type systemType, SystemView system) {
+        private static void DrawSystemWithColor(Type systemType, ref SystemView system) {
             var atribute = (SystemColorAttribute) Attribute.GetCustomAttribute(systemType, typeof(SystemColorAttribute));
-            var style = new GUIStyle(EditorStyles.textField);
-            style.normal.textColor = atribute.color;
+            var style = new GUIStyle(EditorStyles.textField) {normal = {textColor = atribute.color}};
             EditorGUILayout.LabelField(system.name, style);
-            EditorGUILayout.LabelField($"{(system.time > 0.002 ? system.time : 0.000): 0.000} ms", style);
+            EditorGUILayout.LabelField($"{(system.timems/* > 0.002 ? system.time : 0.000*/): 0.000} ms, av {system.GetAvarage() : 0.000} ms", style);
         }
 
         private SystemView[] SortByTime(SystemView[] array)
         {
-            Array.Sort(array, (x, y) => y.time.CompareTo(x.time));
+            Array.Sort(array, (x, y) => y.timems.CompareTo(x.timems));
             return array;
         }
 
@@ -123,7 +129,11 @@ namespace Wargon.ezs.Unity
             Array.Sort(array, (x, y) => string.Compare(y.name, x.name, StringComparison.Ordinal));
             return array;
         }
-
+        private SystemView[] SortByAvarage(SystemView[] array)
+        {
+            Array.Sort(array, (x, y) => y.timems.CompareTo(x.avarage));
+            return array;
+        }
         private void AddDuration(float duration)
         {
             if (Time.renderedFrameCount == lastRenderedFrameCount)
@@ -139,9 +149,31 @@ namespace Wargon.ezs.Unity
 
         private struct SystemView
         {
-            public double time;
+            public double timems;
             public double maxTime;
+            public Queue<double> tenTimes;
+            public double mid;
             public string name;
+            public bool active;
+            private int lastTimeIndex;
+            private int timesCount;
+            public double avarage;
+            public void SetNewTime(double value) {
+                tenTimes.Enqueue(value);
+                if (tenTimes.Count == 200) {
+                    tenTimes.Dequeue();
+                }
+            }
+
+            public double GetAvarage() {
+                avarage = 0;
+                foreach (var tenTime in tenTimes) {
+                    avarage += tenTime;
+                }
+
+                avarage /= tenTimes.Count;
+                return avarage;
+            }
         }
     }
 }

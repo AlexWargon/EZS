@@ -5,26 +5,28 @@ using System.Linq;
 using System.Reflection;
 using UnityEditor;
 using UnityEngine;
-using Object = UnityEngine.Object;
+using UnityObject = UnityEngine.Object;
 
 namespace Wargon.ezs.Unity
 {
-    public static class ComponentInspector
+    public static class ComponentInspectorInternal
     {
         private static bool remove;
         private static int Count;
         private static Dictionary<Type, ITypeInspector> inspectors;
-        private static Dictionary<Type, ListInspector> listInspectors;
+        private static Dictionary<Type, ListInspector> listInspecors;
         private static Dictionary<Type, TextAsset> scriptsAssets;
+        private static Dictionary<Type, IComponentInspector> componentInspectors;
         private static Dictionary<Type, bool> csFileExist;
         private static bool inited;
         public static void Init()
         {
             if(inited) return;
             inspectors = new Dictionary<Type, ITypeInspector>();
+            listInspecors = new Dictionary<Type, ListInspector>();
             scriptsAssets = new Dictionary<Type, TextAsset>();
+            componentInspectors = new Dictionary<Type, IComponentInspector>();
             csFileExist = new Dictionary<Type, bool>();
-            listInspectors = new Dictionary<Type, ListInspector>();
             CrateInspectors();
             FillScriptAssets();
             inited = true;
@@ -40,18 +42,25 @@ namespace Wargon.ezs.Unity
         private static void CrateInspectors()
         {
             var assembly = Assembly.GetAssembly(typeof(ITypeInspector));
-            //var newList = new List<ITypeInspector>();
+            
             foreach (var type in assembly.GetTypes())
             {
                 if (typeof(ITypeInspector).IsAssignableFrom(type) && type != typeof(TypeInspector<>) && !type.IsInterface)
                 {
-                    var inspector = Activator.CreateInstance(type)  as ITypeInspector;
-                    //Debug.Log($"type {inspector.GetType()} --- generic type {inspector.GetGenericType()}");
-                    inspectors.Add(inspector.GetGenericType(), inspector);
+                    var inspector = (ITypeInspector)Activator.CreateInstance(type);
+                    inspectors.Add(inspector.GetTypeOfField(), inspector);
+                }
+                else
+                if (typeof(IComponentInspector).IsAssignableFrom(type) && type != typeof(ComponentInspector<>) && !type.IsInterface)
+                {
+                    var inspector = (IComponentInspector)Activator.CreateInstance(type);
+                    Log.Show(Color.green, inspector.ComponentType.Name);
+                    inspector.OnCreate();
+                    componentInspectors.Add(inspector.ComponentType, inspector);
                 }
             }
         }
-
+        
         private static bool IsSubclassOfRawGeneric(Type generic, Type toCheck)
         {
             while (toCheck != null && toCheck != typeof(object))
@@ -69,13 +78,38 @@ namespace Wargon.ezs.Unity
             var inspectorType = typeof(TypeInspector<>);
             return Activator.CreateInstance(inspectorType.MakeGenericType(type)) as ITypeInspector;
         }
-
-        public static ITypeInspector GetInspector(Type type)
+        
+        private static ITypeInspector GetInspector(Type key)
         {
-            return inspectors[type];
+            if (!inspectors.ContainsKey(key))
+            {
+                if (key == typeof(UnityObject) || key.IsSubclassOf(typeof(UnityObject)))
+                {
+                    var inspector = UnityObjectInspector.New(key) as ITypeInspector;
+                    if (inspector != null)
+                    {
+                        inspectors.Add(key, inspector);
+                    }
+                    return inspector;
+                }
+            }
+
+            if (!inspectors.ContainsKey(key))
+                return null;
+            return inspectors[key];
         }
 
-        public static void DrawComponentBox(MonoEntity entity, int index, MonoEntity[] manyEntities, int count)
+        private static ListInspector GetListInspector(Type key)
+        {
+            if (!listInspecors.ContainsKey(key))
+            {
+                var inspector = new ListInspector();
+                inspector.Init(key);
+                listInspecors.Add(key, inspector);
+            }
+            return listInspecors[key];
+        }
+        public static void DrawComponentBox(MonoEntity entity, int index, MonoEntity[] manyEntities, int count, UnityObject target)
         {
             Count = count;
             if (entity.ComponentsCount < index) return;
@@ -85,7 +119,7 @@ namespace Wargon.ezs.Unity
             if (entity.runTime)
             {
                 var componentTypeID = entity.Entity.GetEntityData().componentTypes.ElementAt(index);
-                var pool = entity.Entity.world.ComponentPools[componentTypeID];
+                var pool = entity.Entity.World.GetPoolByID(componentTypeID);
                 component = pool.Get(entity.Entity.id);
                 type = pool.ItemType;
                 EntityGUI.Vertical(EntityGUI.GetColorStyleByType(type), () => { DrawRunTimeMode(entity, component, pool); });
@@ -99,7 +133,7 @@ namespace Wargon.ezs.Unity
             }
 
             if (remove)
-                Remove(entity, index, manyEntities);
+                Remove(entity, index, manyEntities, target);
         }
 
         private static void RemoveBtn()
@@ -112,107 +146,65 @@ namespace Wargon.ezs.Unity
         private static void DrawTypeField(object component, FieldInfo field)
         {
             var fieldValue = field.GetValue(component);
-            var fieldType = field.FieldType;
-
-             if (fieldType == typeof(Object) || fieldType.IsSubclassOf(typeof(Object)))
-             {
-                 EntityGUI.Horizontal(() =>
-                 {
-                     fieldValue =
-                         EditorGUILayout.ObjectField($"    {field.Name}", fieldValue as Object, fieldType, true);
-                     component.GetType().GetField(field.Name).SetValue(component, fieldValue);
-                 });
-                 return;
-             }
-
-            EntityGUI.Horizontal(() => SetFieldValue(fieldValue, field.Name, component));
+            EntityGUI.Horizontal(() => DrawField(fieldValue, field.Name,  field.FieldType, component));
         }
 
         private static void DrawTypeFieldRunTime(object component, FieldInfo field)
         {
             if (component == null) return;
             var fieldValue = field.GetValue(component);
-            var fieldType = field.FieldType;
-            
-            if (fieldType == typeof(Object) || fieldType.IsSubclassOf(typeof(Object)))
-            {
-                EntityGUI.Horizontal(() =>
-                {
-                    fieldValue =
-                        EditorGUILayout.ObjectField($"    {field.Name}", fieldValue as Object, fieldType, true);
-                    component.GetType().GetField(field.Name).SetValue(component, fieldValue);
-                });
-                return;
-            }
-
-            EntityGUI.Horizontal(() => SetFieldValue(fieldValue, field.Name, component));
+            EntityGUI.Horizontal(() => DrawField(fieldValue, field.Name, field.FieldType, component));
         }
 
-        private static void SetFieldValue(object fieldValue, string fieldName, object component)
+        private static void DrawField(object fieldValue, string fieldName, Type fieldType, object component)
         {
-            if (fieldValue == null) return;
-            var fieldType = fieldValue.GetType();
-            fieldType = typeof(IList).IsAssignableFrom(fieldType) ? typeof(IList) : fieldType;
-            if (fieldType == typeof(Object) || fieldType.IsSubclassOf(typeof(Object)))
+            var isList = typeof(IList).IsAssignableFrom(fieldType);
+            var inspector = isList ? GetListInspector(fieldType.GetElementsType()) : fieldType.IsEnum ? GetInspector(typeof(Enum)) : GetInspector(fieldType);
+            if (inspector != null)
             {
-                fieldValue = GetInspector(typeof(Object)).DrawIn(fieldName, fieldValue);
-            }
-            else
-            if (inspectors.ContainsKey(fieldType))
-            {
-                if (typeof(IList).IsAssignableFrom(fieldType))
+                if (isList)
                 {
-                    if (GetInspector(typeof(IList)) is ListInspector inspecotr)
+                    if (inspector is ListInspector listInspector)
                     {
-                        inspecotr.Init(fieldValue as IList, fieldValue.GetType().GetElementType());
-                        fieldValue = inspecotr.DrawIn(fieldName, fieldValue);
+                        if(!inspectors.ContainsKey(listInspector.FieldType)) return;
+                        listInspector.SetTypeOfField(fieldType);
+                        listInspector.SetTarget((IList)fieldValue);
+                        listInspector.Init(fieldType.GetElementsType());
+                        fieldValue = listInspector.Render(fieldName, fieldValue);
                     }
                 }
-                
                 else
                 {
-                    fieldValue = GetInspector(fieldValue.GetType()).DrawIn(fieldName, fieldValue);
-                    //Debug.Log(fieldValue.GetType());
+                    fieldValue = inspector.Render(fieldName, fieldValue);
                 }
             }
-
             component.GetType().GetField(fieldName).SetValue(component, fieldValue);
         }
 
         public static void SetCollectionElement(Rect rect, object elementValue , int index, string fieldName, Type elementType, object collection)
         {
-            if (elementType == typeof(Object) || elementType.IsSubclassOf(typeof(Object)))
+            var isList = typeof(IList).IsAssignableFrom(elementType);
+            var inspector = isList ? GetListInspector(elementType.GetElementsType()) : GetInspector(elementType);
+            if (inspector != null)
             {
-                EntityGUI.Horizontal(() =>
+                if (isList)
                 {
-                    elementValue = EditorGUI.ObjectField(new Rect(rect.x + 10, rect.y, rect.width - 20, EditorGUIUtility.singleLineHeight),$"    {fieldName}", elementValue as Object, elementType, true);
-                });
-                return;
-            }
-
-            if (elementValue == null) return;
-
-            elementType = typeof(IList).IsAssignableFrom(elementType) ? typeof(IList) : elementType;
-            if (elementType == typeof(Object) || elementType.IsSubclassOf(typeof(Object)))
-            {
-                elementValue = GetInspector(typeof(Object)).DrawCollectionElement(new Rect(rect.x + 10, rect.y, rect.width - 20, EditorGUIUtility.singleLineHeight), elementValue);
-            }
-            else
-            if (inspectors.ContainsKey(elementType))
-            {
-                if (typeof(IList).IsAssignableFrom(elementType))
-                {
-                    var inspecotr = (ListInspector) GetInspector(typeof(IList));
-                    inspecotr.Init(elementValue as IList, elementValue.GetType().GetElementType());
-                    elementValue = inspecotr.DrawCollectionElement(new Rect(rect.x + 10, rect.y, 250, EditorGUIUtility.singleLineHeight), elementValue);
+                    if (inspector is ListInspector listInspector)
+                    {
+                        listInspector.SetTarget((IList)elementValue);
+                        listInspector.Init(elementType.GetElementsType());
+                        elementValue = listInspector.DrawCollectionElement(new Rect(rect.x + 10, rect.y, 250, EditorGUIUtility.singleLineHeight), elementValue, index);
+                    }
                 }
                 else
-                    elementValue = GetInspector(elementValue.GetType()).DrawCollectionElement(new Rect(rect.x + 10, rect.y, rect.width - 20, EditorGUIUtility.singleLineHeight), elementValue);
+                {
+                    elementValue = inspector.DrawCollectionElement(new Rect(rect.x + 10, rect.y, rect.width - 20, EditorGUIUtility.singleLineHeight), elementValue, index);
+                }
             }
-            collection.GetType().GetProperty("Item").SetValue(collection, elementValue, new object[] { index });
+            collection.GetType().GetProperty("Item")?.SetValue(collection, elementValue, new object[] { index });
         }
 
-        private static void Remove(MonoEntity entity, int index, MonoEntity[] manyEntities)
+        private static void Remove(MonoEntity entity, int index, MonoEntity[] manyEntities, UnityObject target)
         {
             var type = entity.Components[index].GetType();
             if (Count > 1)
@@ -229,6 +221,7 @@ namespace Wargon.ezs.Unity
                     {
                         if (e.Components.HasType(type))
                             e.Components.RemoveAt(index);
+                        EditorUtility.SetDirty(target);
                         remove = false;
                     }
                 }
@@ -244,6 +237,7 @@ namespace Wargon.ezs.Unity
                 {
                     entity.Components.RemoveAt(index);
                     remove = false;
+                    EditorUtility.SetDirty(target);
                 }
             }
         }
@@ -262,8 +256,14 @@ namespace Wargon.ezs.Unity
                 entity.Components = entity.Components.Where(x => x != null).ToList();
                 return;
             }
-
+            
             var type = component.GetType();
+            if (componentInspectors.ContainsKey(type))
+            {
+                componentInspectors[type].Draw(component);
+                return;
+            }
+            
             var fields = type.GetFields(BindingFlags.Instance | BindingFlags.Public);
             EntityGUI.Horizontal(() =>
             {
@@ -290,8 +290,8 @@ namespace Wargon.ezs.Unity
             DrawScirptField(type);
             for (var i = 0; i < fields.Length; i++)
                 DrawTypeFieldRunTime(component, fields[i]);
-
-            pool.Set(component, entity.Entity.id);
+            
+            pool.SetBoxed(component, entity.Entity.id);
         }
 
 
@@ -299,7 +299,7 @@ namespace Wargon.ezs.Unity
         {
             if (entity.GetEntityData().componentTypes.Count <= index) return;
             var componentTypeID = entity.GetEntityData().componentTypes.ElementAt(index);
-            var pool = entity.world.ComponentPools[componentTypeID];
+            var pool = entity.World.GetPoolByID(componentTypeID);
             var component = pool.Get(entity.id);
             var type = component.GetType();
             EntityGUI.Vertical(EntityGUI.GetColorStyleByType(type),
@@ -327,7 +327,7 @@ namespace Wargon.ezs.Unity
             for (var i = 0; i < fields.Length; i++)
                 DrawTypeFieldRunTime(component, fields[i]);
 
-            pool.Set(component, entity.id);
+            pool.SetBoxed(component, entity.id);
         }
 
 
@@ -359,6 +359,14 @@ namespace Wargon.ezs.Unity
                 csFileExist.Add(type, true);
                 scriptsAssets.Add(type, temp);
             }
+        }
+    }
+
+    public static class TypeExtensions
+    {
+        public static Type GetElementsType(this Type target)
+        {
+            return !target.IsArray ? target.GetGenericArguments()[0] : target.GetElementType();
         }
     }
 }

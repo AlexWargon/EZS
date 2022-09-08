@@ -15,4 +15,8 @@ public class SystemColorAttribute : Attribute {
     public SystemColorAttribute(string colorName) {
         color = colors[colorName];
     }
+
+    public SystemColorAttribute(float r, float g, float b) {
+        color = new Color(r, g, b);
+    }
 }

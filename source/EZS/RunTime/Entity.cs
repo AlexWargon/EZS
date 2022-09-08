@@ -1,261 +1,231 @@
 using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
-using Wargon.ezs.Unity;
 
 namespace Wargon.ezs
 {
     [Serializable]
-    public partial class Entity
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+    public struct Entity : IEquatable<Entity>
     {
         public int id;
         public int generation;
-        public World world;
+        public World World;
+        public static Entity Null => new Entity();
+        [MethodImpl (MethodImplOptions.AggressiveInlining)]
+        public static bool operator == (in Entity lhs, in Entity rhs) {
+            return lhs.id == rhs.id && lhs.generation == rhs.generation;
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static bool operator !=(in Entity lhs, in Entity rhs) {
+            return lhs.id != rhs.id || lhs.generation != rhs.generation;
+        }
+        public bool Equals(Entity other) {
+            return id == other.id && generation == other.generation && World == other.World;
+        }
+        public override int GetHashCode() {
+            unchecked {
+                var hashCode = id;
+                hashCode = (hashCode * 397) ^ generation;
+                // ReSharper disable once NonReadonlyMemberInGetHashCode
+
+                hashCode = (hashCode * 397) ^ (World != null ? World.GetHashCode() : 0);
+                return hashCode;
+            }
+        }
+        public override bool Equals(object obj) {
+            return obj is Entity other && Equals(other);
+        }
     }
-    
-    public partial class Entity
+
+    public static class EntityExtensionMethods
     {
         // ReSharper disable Unity.PerformanceAnalysis
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Add<A>(A component)
+        public static void Add<A>(in this Entity e, in A component) where A : new()
         {
-            ref var data = ref world.GetEntityData(id);
+            ref var data = ref e.World.GetEntityData(e.id);
             var typeId = ComponentType<A>.ID;
-            if (data.componentTypes.Contains(typeId)) return;
 #if DEBUG
-            if (data.generation != generation)
+            if (data.generation != e.generation)
                 throw new Exception("ENTITY NULL OR DESTROYED! Method: Entity.Add<T>(T component)");
 #endif
-            data.componentTypes.Add(typeId);
-            data.componentsCount++;
-            var pool = world.GetPool<A>();
-            pool.Set(component, id);
-            pool.Add(id);
-            world.OnAddComponent(typeId, this);
+            if (data.componentTypes.Add(typeId)) {
+                data.componentsCount++;
+                var pool = e.World.GetPool<A>();
+                pool.Set(component, e.id);
+                pool.Add(e.id);
+                e.World.OnAddComponent(typeId, in e);
+            }
         }
 
+        // ReSharper disable Unity.PerformanceAnalysis
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Add<A>(A component, bool isClass = false) where A : struct
+        public static ref A Get<A>(in this Entity e) where A : new()
         {
-            ref var data = ref world.GetEntityData(id);
+            ref var data = ref e.World.GetEntityData(e.id);
+            var typeId = ComponentType<A>.ID;
+#if DEBUG
+            if (data.generation != e.generation) throw new Exception("ENTITY NULL OR DESTROYED! Method: Entity.Get<T>()");
+#endif
+            if (data.componentTypes.Contains(typeId)) return ref e.World.GetPool<A>().items[e.id];
+
+            data.componentTypes.Add(typeId);
+            data.componentsCount++;
+            var pool = e.World.GetPool<A>();
+            pool.Set(e.id);
+            pool.Add(e.id);
+            e.World.OnAddComponent(typeId, in e);
+            return ref pool.items[e.id];
+        }
+        // ReSharper disable Unity.PerformanceAnalysis
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static ref A GetRef<A>(in this Entity e) where A : new()
+        {
+            ref var data = ref e.World.GetEntityData(e.id);
+            var typeId = ComponentType<A>.ID;
+#if DEBUG
+            if (data.generation != e.generation) throw new Exception("ENTITY NULL OR DESTROYED! Method: Entity.GetRef<T>()");
+#endif
+            if (data.componentTypes.Contains(typeId)) return ref e.World.GetPool<A>().items[e.id];
+
+            data.componentTypes.Add(typeId);
+            data.componentsCount++;
+            var pool = e.World.GetPool<A>();
+            pool.Set(e.id);
+            pool.Add(e.id);
+            e.World.OnAddComponent(typeId, in e);
+            return ref pool.items[e.id];
+        }
+        // ReSharper disable Unity.PerformanceAnalysis
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void Set<A>(in this Entity e) where A : new()
+        {
+            ref var data = ref e.World.GetEntityData(e.id);
+#if DEBUG
+            if (data.generation != e.generation) throw new Exception("ENTITY NULL OR DESTROYED! Method: Entity.Set<T>()");
+#endif
+            
             var typeId = ComponentType<A>.ID;
             if (data.componentTypes.Contains(typeId)) return;
-#if DEBUG
-            if (data.generation != generation)
-                throw new Exception("ENTITY NULL OR DESTROYED!");
-#endif
+            
             data.componentTypes.Add(typeId);
             data.componentsCount++;
-            var pool = world.GetPool<A>();
-            pool.Set(component, id);
-            pool.Add(id);
-            world.OnAddComponent(typeId, this);
-        }
-
-        // ReSharper disable Unity.PerformanceAnalysis
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public A Get<A>()
-        {
-            ref var data = ref world.GetEntityData(id);
-            var typeId = ComponentType<A>.ID;
-#if DEBUG
-            if (data.generation != generation) throw new Exception("ENTITY NULL OR DESTROYED! Method: Entity.Get<T>()");
-#endif
-            if (data.componentTypes.Contains(typeId)) return world.GetPool<A>().items[id];
-
-            data.componentTypes.Add(typeId);
-            data.componentsCount++;
-            var pool = world.GetPool<A>();
-            pool.Set(id);
-            pool.Add(id);
-            world.OnAddComponent(typeId, this);
-            return pool.items[id];
-        }
-        // ReSharper disable Unity.PerformanceAnalysis
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ref A GetRef<A>()
-        {
-            ref var data = ref world.GetEntityData(id);
-            var typeId = ComponentType<A>.ID;
-#if DEBUG
-            if (data.generation != generation) throw new Exception("ENTITY NULL OR DESTROYED! Method: Entity.GetRef<T>()");
-#endif
-            if (data.componentTypes.Contains(typeId)) return ref world.GetPool<A>().items[id];
-
-            data.componentTypes.Add(typeId);
-            data.componentsCount++;
-            var pool = world.GetPool<A>();
-            pool.Set(id);
-            pool.Add(id);
-            world.OnAddComponent(typeId, this);
-            return ref pool.items[id];
-        }
-        // ReSharper disable Unity.PerformanceAnalysis
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Set<A>()
-        {
-            ref var data = ref world.GetEntityData(id);
-#if DEBUG
-            if (data.generation != generation) throw new Exception("ENTITY NULL OR DESTROYED! Method: Entity.Set<T>()");
-#endif
-            var pool = world.GetPool<A>();
-            var typeId = ComponentType<A>.ID;
-            if (data.componentTypes.Contains(typeId)) return;
-
-            data.componentTypes.Add(typeId);
-            data.componentsCount++;
-            pool.Set(id);
-            pool.Add(id);
-            world.OnAddComponent(typeId, this);
+            var pool = e.World.GetPool<A>();
+            pool.Set(e.id);
+            pool.Add(e.id);
+            e.World.OnAddComponent(typeId, in e);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Replace<A>(A component)
+        public static void Replace<A>(in this Entity e, A component) where A : new()
         {
-            ref var data = ref world.GetEntityData(id);
-            if (data.generation != generation)
+            ref var data = ref e.World.GetEntityData(e.id);
+            if (data.generation != e.generation)
                 throw new Exception("ENTITY NULL OR DESTROYED!");
 
             var typeId = ComponentType<A>.ID;
             if (data.componentTypes.Contains(typeId))
             {
-                var pool = world.GetPool<A>();
-                pool.Set(component, id);
+                var pool = e.World.GetPool<A>();
+                pool.Set(component, e.id);
             }
             else
             {
                 data.componentTypes.Add(typeId);
                 data.componentsCount++;
-                var pool = world.GetPool<A>();
-                pool.Set(component, id);
-                pool.Add(id);
-                world.OnAddComponent(typeId, this);
+                var pool = e.World.GetPool<A>();
+                pool.Set(component, e.id);
+                pool.Add(e.id);
+                e.World.OnAddComponent(typeId, in e);
             }
         }
-
+    
         // ReSharper disable Unity.PerformanceAnalysis
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Remove<A>()
+        public static void Remove<A>(in this Entity e) where A : new()
         {
-            ref var data = ref world.GetEntityData(id);
-            if (data.generation != generation)
+            ref var data = ref e.World.GetEntityData(e.id);
+            if (data.generation != e.generation)
             {
-                UnityEngine.Debug.LogError("ENTITY NULL OR DESTROYED!");
-                return;
+                throw new Exception("ENTITY NULL OR DESTROYED! Method: Entity.Remove<T>()");
             }
             var typeId = ComponentType<A>.ID;
             if (data.componentTypes.Remove(typeId))
             {
                 data.componentsCount--;
-                world.GetPool<A>().Remove(id);
-                world.OnRemoveComponent(typeId, this);
+                e.World.GetPool<A>().Remove(e.id);
+                e.World.OnRemoveComponent(typeId, in e);
                 if (data.componentsCount < 1) {
-                    Destroy();
-                    //UnityEngine.Debug.Log($"ENTITY WITH {typeof(A)} DESTTOYED");
+                    e.Destroy();
                 }
             }
         }
 
         // ReSharper disable Unity.PerformanceAnalysis
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void RemoveByTypeID(int typeId)
+        public static void RemoveByTypeID(in this Entity e, int typeId)
         {
-            ref var data = ref world.GetEntityData(id);
-            if (data.generation != generation)
+            ref var data = ref e.World.GetEntityData(e.id);
+            if (data.generation != e.generation)
                 throw new Exception("ENTITY NULL OR DESTROYED!");
 
             if (data.componentTypes.Remove(typeId))
             {
                 data.componentsCount--;
-                world.GetPoolByID(typeId).Remove(id);
-                world.OnRemoveComponent(typeId, this);
+                e.World.GetPoolByID(typeId).Remove(e.id);
+                e.World.OnRemoveComponent(typeId, in e);
                 if (data.componentsCount < 1)
-                    Destroy();
+                    e.Destroy();
             }
         }
 
+        // ReSharper disable Unity.PerformanceAnalysis
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool Has<A>()
+        public static bool Has<A>(in this Entity e)
         {
-            ref var data = ref world.GetEntityData(id);
-            if (data.generation != generation)
+            ref var data = ref e.World.GetEntityData(e.id);
+            if (data.generation != e.generation)
             {
-                UnityEngine.Debug.LogError("ENTITY NULL OR DESTROYED!");
+                //UnityEngine.Debug.LogError("ENTITY NULL OR DESTROYED!");
                 return false;
             }
             var typeId = ComponentType<A>.ID;
             return data.componentTypes.Contains(typeId);
         }
 
+        // ReSharper disable Unity.PerformanceAnalysis
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public Entity Copy()
+        public static ref EntityData GetEntityData(in this Entity e)
         {
-            var copy = world.CreateEntity();
-            ref var copyData = ref world.GetEntityData(copy.id);
-            ref var data = ref world.GetEntityData(id);
+            return ref e.World.GetEntityData(e.id);
+        }
 
-            foreach (var typeId in data.componentTypes)
-            {
-                var pool = world.GetPoolByID(typeId);
-
-                copyData.componentTypes.Add(typeId);
-                world.OnRemoveComponent(typeId, this);
-                copyData.componentsCount++;
-                pool.Set(copy.id);
+        // ReSharper disable Unity.PerformanceAnalysis
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void Destroy(in this Entity e)
+        {
+            ref var data = ref e.World.GetEntityData(e.id);
+            foreach (var dataComponentType in data.componentTypes) {
+                e.World.GetPoolByID(dataComponentType).Remove(e.id);
             }
-
-            return copy;
-        }
-
-        // ReSharper disable Unity.PerformanceAnalysis
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ref EntityData GetEntityData()
-        {
-            return ref world.GetEntityData(id);
-        }
-
-        // ReSharper disable Unity.PerformanceAnalysis
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Destroy()
-        {
-            ref var data = ref world.GetEntityData(id);
-            foreach (var dataComponentType in data.componentTypes)
-                world.ComponentPools[dataComponentType].Default(id);
             data.componentsCount = 0;
             data.componentTypes.Clear();
             data.generation++;
-            generation = -1;
-            world.OnDestroyEntity(this);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void SetActive(bool value)
-        {
-            ref var data = ref world.GetEntityData(id);
-            if (data.generation != generation) throw new Exception("ENTITY NULL OR DESTROYED");
-            if (data.active == value) return;
-            data.active = value;
-            if (value)
-                world.OnActivateEntity(this, data);
-            else
-                world.OnDeActivateEntity(this, data);
+            e.World.OnDestroyEntity(in e);
         }
 
         // ReSharper disable Unity.PerformanceAnalysis
+        /// <summary>
+        /// Check is entity destroyed or alive
+        /// </summary>
+        /// <param name="e"></param>
+        /// <returns></returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool IsDead()
-        {
-            return generation == -1;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool IsActive()
-        {
-            if (world == null)
-                return false;
-            ref var data = ref world.GetEntityData(id);
-            if (data.generation != generation) throw new Exception("ENTITY NULL OR DESTROYED");
-            return data.active;
+        public static bool IsNULL(in this Entity e) {
+            if (e.World == null) return true;
+            ref var data = ref e.World.GetEntityData(e.id);
+            return data.generation != e.generation;
         }
     }
 
@@ -266,97 +236,6 @@ namespace Wargon.ezs
         public int componentsCount;
         public HashSet<int> componentTypes;
         public int generation;
-        public bool active;
-    }
-
-    public static class EntityExtension
-    {
-        //private static readonly MethodInfo AddComponent = typeof(Entity).GetMethod("Add");
-        public static void AddBoxed(this Entity entity, object component)
-        {
-            if (component == null)
-            {
-                UnityEngine.Debug.LogError($"Try add null component on entity {entity.id} " + Environment.NewLine +
-                                "Looks like some component on prefab was currupted :C");
-            }
-            var type = component.GetType();
-            var typeId = ComponentTypeMap.GetID(type);
-
-            ref var data = ref entity.GetEntityData();
-            var pool = entity.world.GetPoolByID(typeId);
-            if (data.generation != entity.generation)
-                throw new Exception("ENTITY NULL OR DESTROYED. Method: Entity.AddBoxed()");
-
-            data.componentTypes.Add(typeId);
-            data.componentsCount++;
-            pool.Set(component, entity.id);
-            pool.Add(entity.id);
-            entity.world.OnAddComponent(typeId, in entity);
-        }
-
-        public static bool Has(this Entity entity, int type)
-        {
-            return entity.GetEntityData().componentTypes.Contains(type);
-        }
-        
-        public static IPool GetPoolByID(this World world, int typeID, Type type)
-        {
-            if (world.ComponentPools.Length < typeID)
-            {
-                var length = world.ComponentPools.Length << 1;
-                while (length <= typeID)
-                    length <<= 1;
-                Array.Resize(ref world.ComponentPools, length);
-            }
-
-            var pool = world.ComponentPools[typeID];
-            if (pool == null)
-            {
-                var poolType = typeof(Pool<>);
-                pool = (IPool) Activator.CreateInstance(poolType.MakeGenericType(type), world.ComponentCacheSize);
-                world.ComponentPools[typeID] = pool;
-            }
-
-            return pool;
-        }
-
-        public static IPool GetPoolByID(this World world, int typeID)
-        {
-            if (world.ComponentPools.Length <= typeID)
-            {
-                var length = world.ComponentPools.Length << 1;
-                while (length <= typeID + 2)
-                    length <<= 1;
-                Array.Resize(ref world.ComponentPools, length);
-            }
-
-            var pool = world.ComponentPools[typeID];
-            if (pool == null)
-            {
-                var poolType = typeof(Pool<>);
-                pool = (IPool) Activator.CreateInstance(poolType.MakeGenericType(ComponentTypeMap.GetTypeByID(typeID)),
-                    world.ComponentCacheSize);
-                world.ComponentPools[typeID] = pool;
-            }
-            return pool;
-        }
-        
-        public static MonoEntity SaveEntity(this Entity entity)
-        {
-            var monoEntity = entity.Get<View>().value;
-            var world = entity.world;
-            ref var data = ref entity.GetEntityData();
-            monoEntity.Components.Clear();
-            foreach (var dataComponentType in data.componentTypes)
-            {
-                var pool = world.GetPoolByID(dataComponentType);
-                var component = pool.Get(entity.id);
-                monoEntity.Components.Add(component);
-            }
-            
-            return monoEntity;
-        }
-
     }
 
     public class SavedEntity

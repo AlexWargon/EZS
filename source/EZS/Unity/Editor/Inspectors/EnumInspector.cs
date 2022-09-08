@@ -6,7 +6,7 @@ namespace Wargon.ezs.Unity
 {
     public class EnumInspector : TypeInspector<Enum>
     {
-        public override object DrawCollectionElement(Rect rect, object element)
+        public override object DrawCollectionElement(Rect rect, object element, int index)
         {
             throw new NotImplementedException();
         }

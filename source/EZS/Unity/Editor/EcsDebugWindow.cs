@@ -48,12 +48,11 @@ namespace Wargon.ezs.Unity
                 Repaint();
         }
 
-        [MenuItem("Window/EcsDebugWindow")]
+        [MenuItem("EZS/EcsDebugWindow")]
         public static void ShowWindow()
         {
             GetWindow(typeof(EcsDebugWindow), false, "Entities", true);
-            inspectorWindow =
-                (EntityInspectorWindow) GetWindow(typeof(EntityInspectorWindow), false, "Entity Inspector", true);
+            inspectorWindow = (EntityInspectorWindow) GetWindow(typeof(EntityInspectorWindow), false, "Entity Inspector", true);
         }
 
         private static void OnFocusEntity(Entity entity)

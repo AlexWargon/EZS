@@ -22,7 +22,7 @@ namespace Wargon.ezs.Unity {
 
         public override bool RequiresConstantRepaint() {
             if (monoEntity == null) return false;
-            if (monoEntity.Entity == null) return false;
+            //if (monoEntity.Entity == default(Entity)) return false;
             return monoEntity.runTime || base.RequiresConstantRepaint();
         }
 
@@ -36,6 +36,14 @@ namespace Wargon.ezs.Unity {
                 manyEntities[i] = (MonoEntity) targets[i];
             }
             monoEntity = (MonoEntity) targets[0];
+            if (GUILayout.Button("TEST JSON")) {
+                Debug.Log(monoEntity.ToJson());
+            }
+
+            monoEntity.json = EditorGUILayout.ObjectField("Json", monoEntity.json, typeof(TextAsset), true) as TextAsset;
+            if (GUILayout.Button("FROM JSON")) {
+                monoEntity.FromJson(monoEntity.json);
+            }
             
             
             EditorGUI.BeginChangeCheck();
@@ -69,7 +77,7 @@ namespace Wargon.ezs.Unity {
             {
                 if (monoEntity.runTime)
                 {
-                    if (monoEntity.Entity.IsDead())
+                    if (monoEntity.Entity.IsNULL())
                     {
                         EditorGUILayout.LabelField("ENTITY DEAD", EditorStyles.whiteLargeLabel);
                         return;
@@ -113,28 +121,20 @@ namespace Wargon.ezs.Unity {
                 }
             }
 
-
-            if (Event.current.rawType == EventType.DragExited)
+            if (Event.current.rawType != EventType.DragExited) return;
+            dragObj = DragAndDrop.objectReferences;
+            foreach (var o in dragObj)
             {
-                dragObj = DragAndDrop.objectReferences;
-                foreach (var o in dragObj)
-                {
-                    currentDragObject = o;
-                }
+                currentDragObject = o;
+            }
+            if (dragObj.Length < 1)
+                currentDragObject = null;
 
-                if (dragObj.Length < 1)
-                    currentDragObject = null;
-
-                DragAndDrop.AcceptDrag();
-                if (currentDragObject != null)
-                {
-                    if (ComponentTypesList.NamesHash.Contains(currentDragObject.name))
-                    {
-
-                        AddComponent(currentDragObject.name, monoEntity);
-                    }
-
-                }
+            DragAndDrop.AcceptDrag();
+            if (currentDragObject == null) return;
+            if (ComponentTypesList.NamesHash.Contains(currentDragObject.name))
+            {
+                AddComponent(currentDragObject.name, monoEntity);
             }
         }
 
@@ -154,6 +154,7 @@ namespace Wargon.ezs.Unity {
 
         private void RemoveAll() {
             monoEntity.Components.Clear();
+            EditorUtility.SetDirty(target);
         }
 
         private void AddComponent(string componentName, MonoEntity entity) {
@@ -161,7 +162,7 @@ namespace Wargon.ezs.Unity {
                 AddComponentRuntime(componentName,entity);
             else
                 AddComponentEditor(componentName,entity);
-            EditorUtility.SetDirty(entity);
+            EditorUtility.SetDirty(target);
         }
         
         private void AddComponentEditor(string componentName, MonoEntity entity)
@@ -188,7 +189,6 @@ namespace Wargon.ezs.Unity {
             var component= NewObject(type);
             entity.Entity.AddBoxed(component);
             entity.Components.Add(component);
-            EditorUtility.SetDirty(entity);
         }
 
         private void DrawComponents() 
@@ -196,7 +196,7 @@ namespace Wargon.ezs.Unity {
             //Resolve(monoEntity);
             for (var index = 0; index < monoEntity.ComponentsCount; index++)
             {
-                ComponentInspector.DrawComponentBox(monoEntity, index, manyEntities, entitiesCount);
+                ComponentInspectorInternal.DrawComponentBox(monoEntity, index, manyEntities, entitiesCount, target);
             }
         }
 

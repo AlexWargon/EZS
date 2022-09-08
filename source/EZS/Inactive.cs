@@ -1,4 +1,4 @@
 ﻿namespace Wargon.ezs.Unity {
     [EcsComponent]
-    public class UnActive { }
+    public struct Inactive { }
 }
