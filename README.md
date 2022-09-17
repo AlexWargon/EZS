@@ -71,7 +71,8 @@ entity.IsDead();
 entity.Destroy();
 ```
 # Components:
-Components are just struct or class with public fields
+Components are just struct or class with public fields\
+(better use structs, most likely in the future framework will support only structs)
 Examples:
 ```C#
 [EcsComponent] // attribute for visual debugging and attachment components to entity from inspector
@@ -79,22 +80,18 @@ public struct Health
 { 
     public int value;
 }
-[EcsComponent]
-public class TransformRef
-{
-    public Transform value;
-}
 ```
 # Systems : 
 
 1. Update systems
 ```C#
 //Type of systems that will execute every time when you call systems.OnUpdate();
-public class UpdateExampleSystem : UpdateSystem 
+//Update systems must be partial, because the framework uses a source generator now.
+public partial class UpdateExampleSystem : UpdateSystem 
 {
     public override void Update() 
     {
-        entities.Each((ref Entity entity, ref Heal heal, ref Health health) => 
+        entities.Each((Entity entity, Heal heal, Health health) => 
         {
                 //some logic
         });
@@ -146,7 +143,7 @@ public class DestroyExampleSystem : DestroySystem
 {
     public override void Execute() 
     {
-        entities.Each((ref Health heath, ref Damaged damage) => 
+        entities.Each((Health heath, Damaged damage) => 
         {
             //some logic
         });
@@ -158,11 +155,11 @@ public class DestroyExampleSystem : DestroySystem
 ```C#
 //execute logic for each entity that has the components specified in it
 
-public class SingleThreadExampleUpdateSystem : UpdateSystem 
+public partial class SingleThreadExampleUpdateSystem : UpdateSystem 
 {
     public override void Update() 
     {
-        entities.Each((ref Rigidbody rb, ref BoxCollider box) => 
+        entities.Each((Rigidbody rb, BoxCollider box) => 
         {
             //some logic
         });
@@ -175,12 +172,12 @@ public class SingleThreadExampleUpdateSystem : UpdateSystem
 //same think like entities.Each(()=>), but use all threads of CPU.
 //p.s. it won't work with unity object types like Transform, GameObject, Rigidbody and others :C
 
-public class MultiThreadExampleUpdateSystem  : UpdateSystem 
+public partial class MultiThreadExampleUpdateSystem  : UpdateSystem 
 {
     public override void Update() 
     {
         //ref keyword if you use struct as component
-        entities.EachThreaded((ref Position pos, ref RayCast ray, ref Impact impact, ref CanReflect reflect, ref BossTag tag) => 
+        entities.EachThreaded((Position pos, RayCast ray, Impact impact, CanReflect reflect, BossTag tag) => 
         {
             //some logic
         });
@@ -190,20 +187,39 @@ public class MultiThreadExampleUpdateSystem  : UpdateSystem
 ```
 3. You can filter entities not only by including components, but also by excluding
 ```C#
-public class WithoutSystemExample  : UpdateSystem 
+public partial class WithoutSystemExample  : UpdateSystem 
 {
     public override void Update() 
     {
         //ref keyword if you use struct as component
-        entities.Without<UnActive, PlayerTag>().EachThreaded((ref Position pos, ref RayCast ray, ref Impact impact, ref CanReflect reflect, ref BossTag tag) => 
+        entities.Without<UnActive, PlayerTag>().EachThreaded((Position pos, RayCast ray, Impact impact, CanReflect reflect, BossTag tag) => 
         {
             //some logic
         });
-        //ref keyword if you use struct as component
-        entities.Without<UnActive, PlayerTag>().Each((Rigidbody rb, ref BoxCollider box) => 
+        
+        entities.Without<UnActive, PlayerTag>().Each((Rigidbody rb, BoxCollider box) => 
         {
             //some logic
         });
+    }
+}
+```
+4. WithOwner
+```C#
+public partial class AbilityExampleSystem  : UpdateSystem 
+{
+    public override void Update() 
+    {
+        entities.Each((Bullet bullet, CollisionEvent collision, Owner owner) => 
+        {
+                // WithOwner take as parameter id of owner entity
+                entities.WithOwner(owner.id).Each((ExplosionOnCollisionAbility ability) => 
+                {
+                        //some logic
+                });
+        });
+
+        
     }
 }
 ```
