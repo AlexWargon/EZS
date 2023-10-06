@@ -3,12 +3,47 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using UnityEngine;
-using System.Linq;
+using System.Runtime.InteropServices;
 using JetBrains.Annotations;
+
 using Random = UnityEngine.Random;
 
 namespace Wargon
 {
+    public static class ArrayHelp {
+        public static void BasicCounting( ref int[] array) //простой вариант сортировки подсчетом
+        {
+            int n = array.Length;
+            int max = 0;
+            for (int i = 0; i < n; i++)
+            {
+                if (max < array[i])
+                {
+                    max = array[i];
+                }
+            }
+
+            int[] freq = new int[max + 1];
+            for (int i = 0; i < max + 1; i++)
+            {
+                freq[i] = 0;
+            }
+            for (int i = 0; i < n; i++)
+            {
+                freq[array[i]]++;
+            }
+
+            for (int i = 0, j = 0; i <= max; i++)
+            {
+                while (freq[i] > 0)
+                {
+                    array[j] = i;
+                    j++;
+                    freq[i]--;
+                }
+            }
+        }
+    }
     public static class Kit
     {
         public static float value => Random.value;
@@ -122,6 +157,8 @@ namespace Wargon
                 aPoint.y * c + aPoint.x * s);
         }
     }
+    
+
 }
 
 public static class ListExtension

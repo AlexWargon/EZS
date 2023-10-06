@@ -10,8 +10,14 @@ namespace Wargon.ezs.Unity
             throw new System.NotImplementedException();
         }
 
-        protected override object Draw(string fieldName, ref Quaternion field)
+        protected override object DrawInternal(string fieldName, ref Quaternion field)
         {
+            var vec = QuaternionToVector4(field);
+            var tempVec = EditorGUILayout.Vector4Field($"    {fieldName}", vec);
+            return Vector4ToQuaternion(tempVec);
+        }
+
+        protected override Quaternion DrawGenericInternal(string fieldName, ref Quaternion field) {
             var vec = QuaternionToVector4(field);
             var tempVec = EditorGUILayout.Vector4Field($"    {fieldName}", vec);
             return Vector4ToQuaternion(tempVec);

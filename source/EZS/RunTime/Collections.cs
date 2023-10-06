@@ -1,75 +1,44 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Runtime.CompilerServices;
-using System.Threading;
-using Unity.Burst;
-using UnityEngine;
+﻿
+using Unity.Collections.LowLevel.Unsafe;
 
 namespace Wargon.ezs
 {
-    public interface ICustomPool
-    {
-        int PoolType { get; set; }
+    using System;
+    using System.Collections.Generic;
+    using System.Runtime.CompilerServices;
+    using System.Threading;
+    using System.Runtime.InteropServices;
 
-        void Clear();
+    public interface IPool<T> : IPool where T : struct {
+        void Set(T component, int id);
+        ref T Get(int id);
     }
-    
-    // [Il2CppSetOption(Option.NullChecks, false)]
-    // [Il2CppSetOption(Option.ArrayBoundsChecks, false)]
-    // [Il2CppSetOption(Option.DivideByZeroChecks, false)]
-
-    public struct Observers {
-        public EntityType[] observers;
-        public int count;
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Add(EntityType entityType) {
-            if (observers.Length <= count) {
-                Array.Resize(ref observers, observers.Length<<1);
-            }
-            observers[count] = entityType;
-            count++;
-        }
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void OnAddInclude(int id) {
-            for (var i = 0; i < count; i++) {
-                observers[i].OnAddInclude(id);
-            }
-        }
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void OnRemoveInclude(int id) {
-            for (var i = 0; i < count; i++) {
-                observers[i].OnRemoveInclude(id);
-            }
-        }
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void OnAddExclude(int id) {
-            for (var i = 0; i < count; i++) {
-                observers[i].OnAddExclude(id);
-            }
-        }
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void OnRemoveExclude(int id) {
-            for (var i = 0; i < count; i++) {
-                observers[i].OnRemoveExclude(id);
-            }
+    public static class PoolExt{
+        public static NativePool<T> AsNative<T>(this Pool<T> pool) where T : unmanaged {
+            return new NativePool<T>(pool);
         }
     }
-    
-    public class Pool<T> : IPool where T : new()
+
+    public unsafe readonly struct NativePool<T> where T : unmanaged {
+        [NativeDisableUnsafePtrRestriction] private readonly T* buffer;
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal NativePool(Pool<T> pool) {
+            fixed (T* ptr = pool.items) buffer = ptr;
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ref T Get(int index) {
+            return ref UnsafeUtility.ArrayElementAsRef<T>(buffer, index);
+        }
+    }
+    public class Pool<T> : IPool<T> where T : struct
     {
         public T[] items;
-        public int length;
-        private bool typeIsStruct;
+        private int length;
+        private readonly bool typeIsStruct;
         public event Action<int> OnRemove;
         public event Action<int> OnAdd;
-
+        public event Action<Pool<T>> OnResize;
         private bool isTag;
-        // public Observers OnAddExclude;
-        // public Observers OnAddInclude;
-        // public Observers OnRemoveExclude;
-        // public Observers OnRemoveInclude;
-        
         public Pool(int size) {
             isTag = ComponentType<T>.IsTag;
             items = new T[size];
@@ -77,44 +46,22 @@ namespace Wargon.ezs
             TypeID = ComponentType<T>.ID;
             typeIsStruct = ComponentType<T>.IsStruct;
             length = size;
-            // OnAddExclude = new Observers {
-            //     observers = new EntityType[4],
-            //     count = 0
-            // };
-            // OnAddInclude = new Observers {
-            //     observers = new EntityType[4],
-            //     count = 0
-            // };
-            // OnRemoveExclude = new Observers {
-            //     observers = new EntityType[4],
-            //     count = 0
-            // };
-            // OnRemoveInclude = new Observers {
-            //     observers = new EntityType[4],
-            //     count = 0
-            // };
         }
 
-        public int TypeID { get; }
-        public int Count { get; set; }
-        public Type ItemType { get; }
+        public int TypeID { [MethodImpl(MethodImplOptions.AggressiveInlining)]get; }
+        public int Count { [MethodImpl(MethodImplOptions.AggressiveInlining)]get; [MethodImpl(MethodImplOptions.AggressiveInlining)]set; }
+        public Type ItemType { [MethodImpl(MethodImplOptions.AggressiveInlining)]get; }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Remove(int entity)
         {
-            OnRemove?.Invoke(entity);
-            // OnRemoveExclude.OnRemoveExclude(entity);
-            // OnRemoveInclude.OnRemoveInclude(entity);
             Count--;
-            Default(entity);
+            items[entity] = default;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Add(int entity)
         {
-            OnAdd?.Invoke(entity);
-            // OnAddExclude.OnAddExclude(entity);
-            // OnAddInclude.OnAddInclude(entity);
             Count++;
         }
 
@@ -125,12 +72,9 @@ namespace Wargon.ezs
             {
                 Array.Resize(ref items, id + 16);
                 length = items.Length;
+                OnResize?.Invoke(this);
             }
-            if (typeIsStruct) {
-                items[id] = default;
-            }
-            else
-                items[id] = new T();
+            items[id] = default;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -139,10 +83,7 @@ namespace Wargon.ezs
             {
                 Array.Resize(ref items, id + 16);
                 length = items.Length;
-            }
-
-            if (!typeIsStruct) {
-                items[id] = new T();
+                OnResize?.Invoke(this);
             }
         }
 
@@ -157,11 +98,9 @@ namespace Wargon.ezs
         {
             if (length - 1 < id)
             {
-                // var dif = length > id ? length - id : id - length;
-                // Array.Resize(ref items, 1 + length + dif);
-                // length = items.Length;
                 Array.Resize(ref items, id + 16);
                 length = items.Length;
+                OnResize?.Invoke(this);
             }
             items[id] = (T)component;
         }
@@ -173,23 +112,25 @@ namespace Wargon.ezs
             {
                 Array.Resize(ref items, id + 16);
                 length = items.Length;
+                OnResize?.Invoke(this);
             }
             items[id] = component;
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Set(ref T component, int id)
+        public void Set(in T component, int id)
         {
             if (length - 1 < id)
             {
                 Array.Resize(ref items, id + 16);
                 length = items.Length;
+                OnResize?.Invoke(this);
             }
             items[id] = component;
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public T Get(int id)
+        public ref T Get(int id)
         {
-            return items[id];
+            return ref items[id];
         }
 
         public override string ToString()
@@ -198,7 +139,24 @@ namespace Wargon.ezs
         }
 
         int IPool.GetSize() => length;
+
+        public unsafe void AddPtr(void* component, int id) {
+            var comp = Marshal.PtrToStructure<T>((IntPtr)component);
+            if (length - 1 < id)
+            {
+                Array.Resize(ref items, id + 16);
+                length = items.Length;
+                OnResize?.Invoke(this);
+            }
+            items[id] = comp;
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Copy(int @from, int to) {
+            Set(in items[@from], to);
+            Count++;
+        }
     }
+
 
     public interface IPool {
         event Action<int> OnAdd;
@@ -211,39 +169,54 @@ namespace Wargon.ezs
         ///     <para>Set component with entity ID to default value </para>
         /// </summary>
         void Default(int id);
-
-        /// <summary>
-        ///     <para>Get boxed component from pool (NEED FOR UNITY EXTENSION)</para>
-        /// </summary>
         object Get(int id);
-
-        /// <summary>
-        ///     <para>Set boxed component to pool (NEED FOR UNITY EXTENSION)</para>
-        /// </summary>
         void SetBoxed(object component, int id);
-
-        /// <summary>
-        ///     <para>Set boxed component to pool (NEED FOR UNITY EXTENSION)</para>
-        /// </summary>
         void Set(int id);
-
         void Add(int entity);
         void Remove(int entity);
         int GetSize();
+#if UNITY_2019_1_OR_NEWER
+        unsafe void AddPtr(void* component, int id);
+#endif
+        void Copy(int from, int to);
     }
 
-    public class GrowList<T>
+    public unsafe struct UnsafeSpan<T> where T: unmanaged {
+        private T* buffer;
+        public int len;
+        public int Count => len;
+        public ref T this[int index] => ref UnsafeUtility.AsRef<T>(buffer);
+        public UnsafeSpan(T* data, int lenght) {
+            buffer = data;
+            len = lenght;
+        }
+    }
+
+    public static class DynaucArrayEx {
+        public unsafe static UnsafeSpan<T> AsSpan<T>(this DynamicArray<T> array) where T : unmanaged {
+            fixed (T* ptr = array.Items) {
+                return new UnsafeSpan<T>(ptr, array.Count);
+            }
+        }
+    }
+    public class DynamicArray<T>
     {
         public int Count;
         public T[] Items;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public GrowList(int capacity)
+        public DynamicArray(int capacity)
         {
             Items = new T[capacity];
             Count = 0;
         }
-
+        public DynamicArray() {
+            Items = Array.Empty<T>();
+            Count = 0;
+        }
+        public static DynamicArray<T> Empty() {
+            return new DynamicArray<T>();
+        }
         public T this[int index]
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -253,7 +226,7 @@ namespace Wargon.ezs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal void Add(T item)
+        public void Add(T item)
         {
             if (Items.Length == Count) Array.Resize(ref Items, Items.Length << 1);
             Items[Count] = item;
@@ -263,17 +236,22 @@ namespace Wargon.ezs
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal ref T GetLast()
         {
-            return ref Items[Count - 1];
+            return ref Items[Count];
         }
-
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal T GetByIndex(int index)
+        internal ref T GetLastWithIncrement()
         {
-            return Items[index];
+            if (Items.Length == Count) Array.Resize(ref Items, Items.Length << 1);
+            return ref Items[Count++];
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal ref T GetByIndex(int index)
+        {
+            return ref Items[index];
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal T Get(int entityID)
+        public T Get(int entityID)
         {
             return Items[entityID];
         }
@@ -289,54 +267,41 @@ namespace Wargon.ezs
             Array.Clear(Items, 0, Items.Length);
             Count = 0;
         }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void ClearCount() {
+            Count = 0;
+        }
     }
-
-
-    public struct ComponentType<T>
+    public interface ISharedComponent { }
+    public readonly struct ComponentType<T>
     {
-        // ReSharper disable once StaticMemberInGenericType
         public readonly static int ID;
-        // ReSharper disable once StaticMemberInGenericType
         public readonly static bool IsStruct;
-        // ReSharper disable once StaticMemberInGenericType
         public readonly static bool IsUnmanaged;
-        // ReSharper disable once StaticMemberInGenericType
         public readonly static bool IsTag;
         static ComponentType()
         {
             var Value = typeof(T);
             IsTag = Value.GetFields().Length < 1;
-            if (ComponentTypeMap.Has(Value))
-            {
-                ID = ComponentTypeMap.GetID(Value);
-            }
-            else
-            {
-                ID = Interlocked.Increment(ref ComponentTypes.Count);
-                ComponentTypeMap.Add(Value, ID);
-            }
-
+            ComponentType.Add(Value);
+            ID = ComponentType.GetID(Value);
+            IsUnmanaged = Value.IsUnmanaged();
             IsStruct = Value.IsValueType;
         }
-    }
-
-    [EcsComponent]
-    public struct TransformRef
-    {
-        public UnityEngine.Transform Value;
     }
     public static class ComponentTypes
     {
         internal static int Count;
+        
     }
     
-    public static class ComponentTypeMap
+    public static class ComponentType
     {
         private static Dictionary<Type, int> TypeID;
         private static Dictionary<int, Type> TypeValue;
         private static bool inited;
 
-        static ComponentTypeMap() {
+        static ComponentType() {
             TypeID = new Dictionary<Type, int>();
             TypeValue = new Dictionary<int, Type>();
         }
@@ -349,6 +314,13 @@ namespace Wargon.ezs
             TypeValue.Add(id, type);
         }
 
+        public static void Add(Type type) {
+            if (TypeID.ContainsKey(type)) return;
+            var id = Interlocked.Increment(ref ComponentTypes.Count);
+            TypeID.Add(type, id);
+            TypeValue.Add(id, type);
+        }
+        
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool Has(Type type)
         {
@@ -368,7 +340,7 @@ namespace Wargon.ezs
             return TypeID[type];
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static Type GetTypeByID(int id)
+        public static Type GetTypeValue(int id)
         {
             return TypeValue[id];
         }
@@ -390,6 +362,15 @@ namespace Wargon.ezs
     
     public static class CollectionHelp
     {
+        class UnamagedGeneric<T> where T : unmanaged { }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static bool IsUnmanaged(this Type t)
+        {
+            try { typeof(UnamagedGeneric<>).MakeGenericType(t); return true; }
+            catch (Exception){ return false; }
+        }
+        
+        
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void ValidateEntityTypes(ref EntityType[] array, ref bool[] actives, int id)
         {
@@ -419,49 +400,9 @@ namespace Wargon.ezs
                 Array.Resize(ref actives, newL);
             }
         }
-        
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void ValidateEntityTypes(ref fEntities[] array, ref bool[] actives, int id)
-        {
-            if (array.Length == id - 1)
-            {
-                var newL = array.Length + 16;
-                Array.Resize(ref array, newL);
-                Array.Resize(ref actives, newL);
-            }
-        }
-    }
-
-    internal class IntKeyMap<TItem> {
-        private TItem[] items;
-        private int[] keys;
-        public int Capacity;
-        public int Count;
-        public ref TItem this[int key] {
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get => ref items[keys[key]];
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void Assert(int key) {
-            if (Capacity <= key) {
-                Resize(key + 16);
-            }
-        }
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void Resize(int newSize) {
-            Array.Resize(ref items, newSize);
-            Capacity = newSize;
-        }
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Add(int key, TItem value) {
-            Assert(key);
-            keys[Count] = key;
-            items[key] = value;
-        }
     }
     
-    internal class IntMap {
+    public class IntMap {
         private int[] items;
         public int Capacity;
 

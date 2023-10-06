@@ -45,7 +45,7 @@ namespace Wargon.ezs
 
         protected readonly World world;
         public int Count;
-        public int[] entities;
+        internal int[] entities;
         internal int[] ExcludeTypes;
         internal int[] IncludeTypes;
         internal readonly IntMap entitiesMap;
@@ -62,7 +62,7 @@ namespace Wargon.ezs
             ExcludeTypes = new int[6];
         }
 
-        protected void SubWith<T>() where T : new() {
+        protected void SubWith<T>() where T : struct {
             var type = ComponentType<T>.ID;
             IncludeTypes[IncludeCount] = type;
             var pool1 = world.GetPool<T>();
@@ -70,7 +70,7 @@ namespace Wargon.ezs
             pool1.OnRemove += OnRemoveInclude;
             IncludeCount++;
         }
-        protected void SubWith<T>(Pool<T> reference) where T : new() {
+        protected void SubWith<T>(Pool<T> reference) where T : struct {
             var type = ComponentType<T>.ID;
             IncludeTypes[IncludeCount] = type;
             var pool1 = world.GetPool<T>();
@@ -79,7 +79,7 @@ namespace Wargon.ezs
             reference.OnRemove += OnRemoveInclude;
             IncludeCount++;
         }
-        protected void SubWithout<T>() where T : new() {
+        protected void SubWithout<T>() where T : struct {
             var type = ComponentType<T>.ID;
             ExcludeTypes[ExcludeCount] = type;
             var pool1 = world.GetPool<T>();
@@ -99,15 +99,15 @@ namespace Wargon.ezs
         public void OnAddIncludeRemoveExclude(int id) {
             if (HasEntity(id)) return;
             ref var data = ref world.GetEntityData(id);
-            for (var i = 0; i < ExcludeCount; i++)
-                if (data.componentTypes.Contains(ExcludeTypes[i]))
-                    return;
+            // for (var i = 0; i < ExcludeCount; i++)
+            //     if (data.componentTypes.Contains(ExcludeTypes[i]))
+            //         return;
+            //
+            // for (var i = 0; i < IncludeCount; i++)
+            //     if (!data.componentTypes.Contains(IncludeTypes[i]))
+            //         return;
 
-            for (var i = 0; i < IncludeCount; i++)
-                if (!data.componentTypes.Contains(IncludeTypes[i]))
-                    return;
-
-            if (entities.Length == Count) Array.Resize(ref entities, world.entitiesCount+2);
+            if (entities.Length == Count) Array.Resize(ref entities, world.totalEntitiesCount+2);
             entities[Count] = data.id;
             entitiesMap.Add(data.id, Count);
             Count++;
@@ -131,13 +131,13 @@ namespace Wargon.ezs
         {
             if (HasEntity(id)) return;
             ref var data = ref world.GetEntityData(id);
-            for (var i = 0; i < ExcludeCount; i++)
-                if (data.componentTypes.Contains(ExcludeTypes[i]))
-                    return;
-
-            for (var i = 0; i < IncludeCount; i++)
-                if (!data.componentTypes.Contains(IncludeTypes[i]))
-                    return;
+            // for (var i = 0; i < ExcludeCount; i++)
+            //     if (data.componentTypes.Contains(ExcludeTypes[i]))
+            //         return;
+            //
+            // for (var i = 0; i < IncludeCount; i++)
+            //     if (!data.componentTypes.Contains(IncludeTypes[i]))
+            //         return;
 
             if (entities.Length == Count) Array.Resize(ref entities, Count+16);
             entities[Count] = data.id;
@@ -161,9 +161,9 @@ namespace Wargon.ezs
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void UpdateOnAddWith(ref EntityData data) {
-            for (var i = 0; i < IncludeCount; i++)
-                if (!data.componentTypes.Contains(IncludeTypes[i]))
-                    return;
+            // for (var i = 0; i < IncludeCount; i++)
+            //     if (!data.componentTypes.Contains(IncludeTypes[i]))
+            //         return;
 
             if (entities.Length == Count) Array.Resize(ref entities, Count+16);
             entities[Count] = data.id;
@@ -201,11 +201,11 @@ namespace Wargon.ezs
         public virtual void UpdateOnRemoveWithout(in EntityData data) {
             if (HasEntity(data.id)) return;
 
-            for (var i = 0; i < IncludeCount; i++)
-                if (!data.componentTypes.Contains(IncludeTypes[i]))
-                    return;
+            // for (var i = 0; i < IncludeCount; i++)
+            //     if (!data.componentTypes.Contains(IncludeTypes[i]))
+            //         return;
 
-            if (entities.Length == Count) Array.Resize(ref entities, world.entitiesCount+2);
+            if (entities.Length == Count) Array.Resize(ref entities, world.totalEntitiesCount+2);
             entities[Count] = data.id;
             entitiesMap.Add(data.id, Count);
             Count++;
@@ -231,15 +231,15 @@ namespace Wargon.ezs
         {
             if (HasEntity(id)) return;
             ref var data = ref world.GetEntityData(id);
-            for (var i = 0; i < ExcludeCount; i++)
-                if (data.componentTypes.Contains(ExcludeTypes[i]))
-                    return;
+            // for (var i = 0; i < ExcludeCount; i++)
+            //     if (data.componentTypes.Contains(ExcludeTypes[i]))
+            //         return;
+            //
+            // for (var i = 0; i < IncludeCount; i++)
+            //     if (!data.componentTypes.Contains(IncludeTypes[i]))
+            //         return;
 
-            for (var i = 0; i < IncludeCount; i++)
-                if (!data.componentTypes.Contains(IncludeTypes[i]))
-                    return;
-
-            if (entities.Length == Count) Array.Resize(ref entities, world.entitiesCount+2);
+            if (entities.Length == Count) Array.Resize(ref entities, world.totalEntitiesCount+2);
             entities[Count] = data.id;
             entitiesMap.Add(data.id, Count);
             Count++;
@@ -249,7 +249,7 @@ namespace Wargon.ezs
         internal virtual void Add(int id)
         {
             if (HasEntity(id)) return;
-            if (entities.Length == Count) Array.Resize(ref entities, world.entitiesCount+2);
+            if (entities.Length == Count) Array.Resize(ref entities, world.totalEntitiesCount+2);
             entities[Count] = id;
             entitiesMap.Add(id, Count);
             Count++;
@@ -283,7 +283,7 @@ namespace Wargon.ezs
         {
             return Count < 1;
         }
-        public class WithOut<NA> : EntityType where NA : new()
+        public class WithOut<NA> : EntityType where NA : struct
         {
             public WithOut(World world) : base(world)
             {
@@ -298,7 +298,7 @@ namespace Wargon.ezs
             }
         }
 
-        public class WithOut<NA, NB> : EntityType where NA : new() where NB : new()
+        public class WithOut<NA, NB> : EntityType where NA : struct where NB : struct
         {
             public WithOut(World world) : base(world)
             {
@@ -318,7 +318,7 @@ namespace Wargon.ezs
         }
     }
     
-    public class EntityType<A> : EntityType where A : new()
+    public class EntityType<A> : EntityType where A : struct
     {
         internal readonly Pool<A> poolA; 
 
@@ -340,7 +340,7 @@ namespace Wargon.ezs
             return poolA.items[entities[index]];
         }
 
-        public class WithOut<NA> : EntityType<A> where NA : new()
+        public class WithOut<NA> : EntityType<A> where NA : struct
         {
             public WithOut(World world) : base(world)
             {
@@ -357,7 +357,7 @@ namespace Wargon.ezs
             }
         }
 
-        public class WithOut<NA, NB> : EntityType<A> where NA : new() where NB : new()
+        public class WithOut<NA, NB> : EntityType<A> where NA : struct where NB : struct
         {
             public WithOut(World world) : base(world)
             {
@@ -377,7 +377,7 @@ namespace Wargon.ezs
         }
     }
 
-    public class EntityType<A, B> : EntityType  where A: new() where B : new()
+    public class EntityType<A, B> : EntityType  where A: struct where B : struct
     {
         internal readonly Pool<A> poolA;
         internal readonly Pool<B> poolB;
@@ -447,7 +447,7 @@ namespace Wargon.ezs
         }
     }
 
-    public class EntityType<A, B, C> : EntityType  where A: new() where B : new() where C : new()
+    public class EntityType<A, B, C> : EntityType  where A: struct where B : struct where C : struct
     {
         internal readonly Pool<A> poolA;
         internal readonly Pool<B> poolB;
@@ -527,7 +527,7 @@ namespace Wargon.ezs
         }
     }
 
-    public class EntityType<A, B, C, D> : EntityType  where A: new() where B : new() where C : new() where D : new()
+    public class EntityType<A, B, C, D> : EntityType  where A: struct where B : struct where C : struct where D : struct
     {
         internal readonly Pool<A> poolA;
         internal readonly Pool<B> poolB;
@@ -618,7 +618,7 @@ namespace Wargon.ezs
         }
     }
 
-    public class EntityType<A, B, C, D, E> : EntityType where A: new() where B : new() where C : new() where D : new() where  E : new()
+    public class EntityType<A, B, C, D, E> : EntityType where A: struct where B : struct where C : struct where D : struct where  E : struct
     {
         internal readonly Pool<A> poolA;
         internal readonly Pool<B> poolB;
@@ -720,7 +720,7 @@ namespace Wargon.ezs
         }
     }
 
-    public class EntityType<A, B, C, D, E, F> : EntityType where A: new() where B : new() where C : new() where D : new() where  E : new() where  F : new()
+    public class EntityType<A, B, C, D, E, F> : EntityType where A: struct where B : struct where C : struct where D : struct where  E : struct where  F : struct
     {
         internal readonly Pool<A> poolA;
         internal readonly Pool<B> poolB;
@@ -798,7 +798,7 @@ namespace Wargon.ezs
             return poolF.items[entities[index]];
         }
 
-        public class WithOut<NA> : EntityType<A, B, C, D, E, F> where NA : new()
+        public class WithOut<NA> : EntityType<A, B, C, D, E, F> where NA : struct
         {
             public WithOut(World world) : base(world)
             {
@@ -813,7 +813,7 @@ namespace Wargon.ezs
             }
         }
 
-        public class WithOut<NA, NB> : EntityType<A, B, C, D, E, F> where NA : new() where NB : new()
+        public class WithOut<NA, NB> : EntityType<A, B, C, D, E, F> where NA : struct where NB : struct
         {
             public WithOut(World world) : base(world)
             {
@@ -833,7 +833,7 @@ namespace Wargon.ezs
         }
     }
 
-    public class EntityType<A, B, C, D, E, F, G> : EntityType  where A: new() where B : new() where C : new() where D : new() where  E : new() where  F : new() where G : new()
+    public class EntityType<A, B, C, D, E, F, G> : EntityType  where A: struct where B : struct where C : struct where D : struct where  E : struct where  F : struct where G : struct
     {
         internal readonly Pool<A> poolA;
         internal readonly Pool<B> poolB;
@@ -1074,8 +1074,7 @@ namespace Wargon.ezs
         }
     }
     
-    public class OwnerQuery : EntityType
-{
+    public class OwnerQuery : EntityType {
     private int ownerID;
     private readonly Pool<Owner> pool;
     
@@ -1096,7 +1095,7 @@ namespace Wargon.ezs
         ownerID = id;
         return this;
     }
-    public OwnerQuery With<T>() where T : new()
+    public OwnerQuery With<T>() where T : struct
     {
         IncludeTypes[IncludeCount] = ComponentType<T>.ID;
         world.GetPool<T>().OnAdd += OnAddInclude;
@@ -1104,7 +1103,7 @@ namespace Wargon.ezs
         IncludeCount++;
         return this;
     }
-    public OwnerQuery Without<T>() where T : new()
+    public OwnerQuery Without<T>() where T : struct
     {
         ExcludeTypes[ExcludeCount] = ComponentType<T>.ID;
         world.GetPool<T>().OnAdd += OnAddExclude;
@@ -1120,8 +1119,8 @@ namespace Wargon.ezs
     internal override void Add(int id)
     {
         if (HasEntity(id)) return;
-        if(pool.items[id].value.id != ownerID) return;
-        if (entities.Length == Count) Array.Resize(ref entities, world.entitiesCount+2);
+        if(pool.items[id].Value.id != ownerID) return;
+        if (entities.Length == Count) Array.Resize(ref entities, world.totalEntitiesCount+2);
         entities[Count] = id;
         entitiesMap.Add(id, Count);
         Count++;
@@ -1131,15 +1130,15 @@ namespace Wargon.ezs
         if (HasEntity(id)) return;
         
         ref var data = ref world.GetEntityData(id);
-        for (var i = 0; i < ExcludeCount; i++)
-            if (data.componentTypes.Contains(ExcludeTypes[i]))
-                return;
-
-        for (var i = 0; i < IncludeCount; i++)
-            if (!data.componentTypes.Contains(IncludeTypes[i]))
-                return;
-        if(pool.items[id].value.id != ownerID) return;
-        if (entities.Length == Count) Array.Resize(ref entities, world.entitiesCount+2);
+        // for (var i = 0; i < ExcludeCount; i++)
+        //     if (data.componentTypes.Contains(ExcludeTypes[i]))
+        //         return;
+        //
+        // for (var i = 0; i < IncludeCount; i++)
+        //     if (!data.componentTypes.Contains(IncludeTypes[i]))
+        //         return;
+        if(pool.items[id].Value.id != ownerID) return;
+        if (entities.Length == Count) Array.Resize(ref entities, world.totalEntitiesCount+2);
         entities[Count] = data.id;
         entitiesMap.Add(data.id, Count);
         Count++;
@@ -1181,15 +1180,15 @@ namespace Wargon.ezs
         if (HasEntity(id)) return;
         
         ref var data = ref world.GetEntityData(id);
-        for (var i = 0; i < ExcludeCount; i++)
-            if (data.componentTypes.Contains(ExcludeTypes[i]))
-                return;
-
-        for (var i = 0; i < IncludeCount; i++)
-            if (!data.componentTypes.Contains(IncludeTypes[i]))
-                return;
-        if(pool.items[id].value.id != ownerID) return;
-        if (entities.Length == Count) Array.Resize(ref entities, world.entitiesCount+2);
+        // for (var i = 0; i < ExcludeCount; i++)
+        //     if (data.componentTypes.Contains(ExcludeTypes[i]))
+        //         return;
+        //
+        // for (var i = 0; i < IncludeCount; i++)
+        //     if (!data.componentTypes.Contains(IncludeTypes[i]))
+        //         return;
+        if(pool.items[id].Value.id != ownerID) return;
+        if (entities.Length == Count) Array.Resize(ref entities, world.totalEntitiesCount+2);
         entities[Count] = data.id;
         entitiesMap.Add(data.id, Count);
         Count++;

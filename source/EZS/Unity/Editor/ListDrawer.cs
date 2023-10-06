@@ -115,7 +115,7 @@ public class ListDrawer
                 {
                     EditorGUILayout.LabelField($"    {fieldName}");
                     EditorGUILayout.IntField("    Entity ID", field.id);
-                    EditorGUILayout.IntField("    Entity GEN", field.generation);
+                    EditorGUILayout.IntField("    Entity GEN", field.InternalGetGeneration());
                 }
 
                 EditorGUILayout.EndVertical();

@@ -10,8 +10,12 @@ namespace Wargon.ezs.Unity
             return EditorGUI.ObjectField(rect,$"element [{index}]", element as Object, FieldType, true);
         }
         
-        protected override object Draw(string fieldName, ref Object field)
+        protected override object DrawInternal(string fieldName, ref Object field)
         {
+            return EditorGUILayout.ObjectField($"    {fieldName}", field, FieldType, true);
+        }
+
+        protected override Object DrawGenericInternal(string fieldName, ref Object field) {
             return EditorGUILayout.ObjectField($"    {fieldName}", field, FieldType, true);
         }
 

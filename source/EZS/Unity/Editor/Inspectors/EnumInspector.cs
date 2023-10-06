@@ -11,9 +11,30 @@ namespace Wargon.ezs.Unity
             throw new NotImplementedException();
         }
 
-        protected override object Draw(string fieldName, ref Enum field)
+        protected override object DrawInternal(string fieldName, ref Enum field)
         {
             return EditorGUILayout.EnumPopup($"    {fieldName}", field);
+        }
+
+        protected override Enum DrawGenericInternal(string fieldName, ref Enum field) {
+            return EditorGUILayout.EnumPopup($"    {fieldName}", field);
+        }
+    }
+    
+    public class EnumFlagInspector : TypeInspector<Enum>
+    {
+        public override object DrawCollectionElement(Rect rect, object element, int index)
+        {
+            throw new NotImplementedException();
+        }
+
+        protected override object DrawInternal(string fieldName, ref Enum field)
+        {
+            return EditorGUILayout.EnumFlagsField($"    {fieldName}", field);
+        }
+
+        protected override Enum DrawGenericInternal(string fieldName, ref Enum field) {
+            return EditorGUILayout.EnumFlagsField($"    {fieldName}", field);
         }
     }
 }

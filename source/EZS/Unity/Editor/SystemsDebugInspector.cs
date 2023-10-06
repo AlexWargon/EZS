@@ -44,7 +44,8 @@ namespace Wargon.ezs.Unity
 
         private void UpdateNameTime()
         {
-            systemsDebugMono.gameObject.name = $"ECS Systems Debug {systemsDebugMono.Systems.executeTime: 0.000} ms";
+            if(systemsDebugMono!=null)
+                systemsDebugMono.gameObject.name = $"ECS Systems Debug {systemsDebugMono.Systems.executeTime: 0.000} ms";
         }
 
         private void DrawSystemsMonitor(SystemsDebug systemsDebug)
@@ -160,7 +161,7 @@ namespace Wargon.ezs.Unity
             public double avarage;
             public void SetNewTime(double value) {
                 tenTimes.Enqueue(value);
-                if (tenTimes.Count == 200) {
+                if (tenTimes.Count == 20) {
                     tenTimes.Dequeue();
                 }
             }

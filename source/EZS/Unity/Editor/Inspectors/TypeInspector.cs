@@ -7,7 +7,7 @@ namespace Wargon.ezs.Unity
     {
         Type GetTypeOfField();
         void SetTypeOfField(Type value);
-        object Render(string fieldName, object field);
+        object Draw(string fieldName, object field);
         object DrawCollectionElement(Rect rect, object element, int index);
     }
 
@@ -28,16 +28,23 @@ namespace Wargon.ezs.Unity
             FieldType = value;
         }
         
-        public object Render(string fieldName, object field)
+        public object Draw(string fieldName, object field)
         {
             var v = (T) field;
             
-            return Draw(fieldName, ref v);
+            return DrawInternal(fieldName, ref v);
         }
 
         public abstract object DrawCollectionElement(Rect rect, object element, int index);
 
-        protected abstract object Draw(string fieldName, ref T field);
+        protected abstract object DrawInternal(string fieldName, ref T field);
+
+        public T DrawGeneric(string fieldName, ref T field) {
+            var v = field;
+            return DrawGenericInternal(fieldName, ref field);
+        }
+
+        protected abstract T DrawGenericInternal(string fieldName, ref T field);
     }
 
 }

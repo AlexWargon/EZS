@@ -70,17 +70,21 @@ namespace Wargon.ezs.Unity
         public override object DrawCollectionElement(Rect rect, object element, int index)
         {
             var o = (IList) element;
-            element = Draw(nameOfField, ref o);
+            element = DrawInternal(nameOfField, ref o);
             return element;
         }
 
-        protected override object Draw(string fieldName, ref IList field)
+        protected override object DrawInternal(string fieldName, ref IList field)
         {
             target = field;
             list.list = field;
             nameOfField = fieldName;
             list.DoLayoutList();
             return target;
+        }
+
+        protected override IList DrawGenericInternal(string fieldName, ref IList field) {
+            return (IList)DrawInternal(fieldName, ref field);
         }
     }
 }

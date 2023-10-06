@@ -1,17 +1,18 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
+using Wargon.DI;
 
 namespace Wargon.ezs {
     public class Systems {
         public bool Alive;
-        private bool debugMode;
         public int id;
+        private bool debugMode;
         private readonly World world;
-        private readonly GrowList<DestroySystem> destroySystemsList = new GrowList<DestroySystem>(4);
-        private readonly GrowList<InitSystem> initSystemsList = new GrowList<InitSystem>(4);
-        private readonly GrowList<ReactiveSystem> reactiveSystmes = new GrowList<ReactiveSystem>(4);
-        public readonly GrowList<UpdateSystem> updateSystemsList = new GrowList<UpdateSystem>(16);
+        private readonly DynamicArray<DestroySystem> destroySystemsList = new DynamicArray<DestroySystem>(4);
+        private readonly DynamicArray<InitSystem> initSystemsList = new DynamicArray<InitSystem>(4);
+        private readonly DynamicArray<ReactiveSystem> reactiveSystmes = new DynamicArray<ReactiveSystem>(4);
+        public readonly DynamicArray<UpdateSystem> updateSystemsList = new DynamicArray<UpdateSystem>(16);
         private readonly Dictionary<int, List<IOnAdd>> onAddSystems = new Dictionary<int, List<IOnAdd>>(4);
         private readonly Dictionary<int, List<IOnRemove>> onRemoveSystems = new Dictionary<int, List<IOnRemove>>(4);
         private readonly Dictionary<int, List<ReactiveSystem>> reactiveSystemsMap = new Dictionary<int, List<ReactiveSystem>>(4);
@@ -33,22 +34,45 @@ namespace Wargon.ezs {
             systemBigListener = listener;
             debugMode = systemBigListener != null;
         }
-
+        
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public Systems Add<T>(T system) where T : UpdateSystem {
-
+            Injector.ResolveObject(system);
+            If_RemoveBefore_then_AddRemoveSystem(system);
             system.Init(world.Entities, world);
             system.ID = updateSystemsCount;
-            //system.Update();
             updateSystemsList.Add(system);
             updateSystemsCount++;
-
             return this;
         }
+        private void If_RemoveBefore_then_AddRemoveSystem<T>(T eventSystem) where T: UpdateSystem {
+            var types = GetGenericType(eventSystem.GetType(), typeof(IRemoveBefore<>));
+            foreach (var type in types) {
+                var typeId = ComponentType.GetID(type);
+                var system = CreateClearEventSystem(typeId);
+                Add(system);
+            }
+        }
+        private static UpdateSystem CreateClearEventSystem(int eventTypeID) {
+            return new RemoveComponentSystem(eventTypeID);
+        }
+        private static List<Type> GetGenericType(Type system, Type @interface) {
+            var types = new List<Type>();
+            foreach(var type in system.GetInterfaces()) {
+                if(type.IsGenericType && type.GetGenericTypeDefinition() == @interface) {
+                    types.Add(type.GetGenericArguments()[0]);
+                }
+            }
 
+            return types;
+        }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public Systems Add(InitSystem system) {
+            Injector.ResolveObject(system);
             initSystemsList.Add(system);
+            if (system is IInject inject) {
+                inject.Inject(world);
+            }
             system.Init(world.Entities, world);
             return this;
         }
@@ -56,6 +80,9 @@ namespace Wargon.ezs {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public Systems Add(DestroySystem system) {
             destroySystemsList.Add(system);
+            if (system is IInject inject) {
+                inject.Inject(world);
+            }
             system.Init(world.Entities, world);
             return this;
         }
@@ -63,17 +90,22 @@ namespace Wargon.ezs {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public Systems Add(SystemsGroup systemsGroup) {
             var systems = systemsGroup.GetSystems();
-            for (var i = 0; i < systemsGroup.Count; i++) Add(systems.Items[i]);
+            //Log.Show($"{systems.Count} systems in system group '{systemsGroup.GetName()}'");
+            for (var i = 0; i < systems.Count; i++) Add(systems.Items[i]);
             return this;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public Systems AddReactive(IReactive system) {
+            if (system is IInject inject) {
+                inject.Inject(world);
+            }
             if (system is IOnAdd add) {
                 var triggerType = add.TriggerType;
                 if (!onAddSystems.ContainsKey(triggerType))
                     onAddSystems.Add(triggerType, new List<IOnAdd>());
                 onAddSystems[triggerType].Add(add);
+                Injector.ResolveObject(add);
                 add.Init(world.Entities, world);
             }
             else if (system is IOnRemove remove) {
@@ -81,6 +113,7 @@ namespace Wargon.ezs {
                 if (!onRemoveSystems.ContainsKey(triggerType))
                     onRemoveSystems.Add(triggerType, new List<IOnRemove>());
                 onRemoveSystems[triggerType].Add(remove);
+                Injector.ResolveObject(remove);
                 remove.Init(world.Entities, world);
             }
             else if (system is ReactiveSystem reactive) {
@@ -90,6 +123,7 @@ namespace Wargon.ezs {
                 reactiveSystemsMap[triggerType].Add(reactive);
                 reactiveSystmes.Add(reactive);
                 reactive.Init(world.Entities, world);
+                Injector.ResolveObject(reactive);
             }
 
             return this;
@@ -135,29 +169,31 @@ namespace Wargon.ezs {
                 systemBigListener.StartCheck();
                 for (var i = 0; i < updateSystemsCount; i++) {
                     systemBigListener.StartCheck(i);
-                    if (systemBigListener.Active(i))
+                    if (systemBigListener.Active(i)) {
                         updateSystemsList.Items[i].OnUpdate();
+                        world.UpdateWorld();
+                    }
                     systemBigListener.StopCheck(i);
                 }
 
                 systemBigListener.StopCheck();
             }
             else {
-                for (var i = 0; i < updateSystemsCount; i++)
+                for (var i = 0; i < updateSystemsCount; i++) {
                     updateSystemsList.Items[i].OnUpdate();
+                    world.UpdateWorld();
+                }
             }
-            // for (var i = 0; i < reactiveSystmes.Count; i++){
-            //     if(reactiveSystmes[i].Rx.Check())
-            //         reactiveSystmes[i].Execute();
-            //}
-
         }
     }
-
-    public sealed class SystemsGroup {
-        private readonly string name;
-        private readonly GrowList<UpdateSystem> systems = new GrowList<UpdateSystem>(4);
-        internal int Count;
+    public static class Generic {
+        public static object New(Type genericType, Type elementsType, params object[] parameters) {
+            return Activator.CreateInstance(genericType.MakeGenericType(elementsType), parameters);
+        }
+    }
+    public class SystemsGroup {
+        public string name;
+        public readonly DynamicArray<UpdateSystem> systems = new DynamicArray<UpdateSystem>(4);
 
         public SystemsGroup() {
             name = "NO_NAME";
@@ -169,11 +205,10 @@ namespace Wargon.ezs {
 
         public SystemsGroup Add(UpdateSystem system) {
             systems.Add(system);
-            Count++;
             return this;
         }
 
-        public GrowList<UpdateSystem> GetSystems() {
+        public DynamicArray<UpdateSystem> GetSystems() {
             return systems;
         }
 
@@ -322,18 +357,23 @@ namespace Wargon.ezs {
 
         public abstract void Execute();
     }
-    
+
+    public interface IInject {
+        void Inject(World world);
+    }
+
+    public interface IRemoveBefore<T>  where T: new() { }
+
     public abstract class UpdateSystem {
-        protected Entities entities;
+        protected Entities entitiesInternal;
+        protected EntitiesEach entities;
         internal int ID;
         protected World world;
-        //protected fEntities fEntities;
-        public virtual void Init(Entities newEntities, World newWorld) {
-            entities = newEntities;
+        internal void Init(Entities newEntities, World newWorld) {
+            entitiesInternal = newEntities;
             world = newWorld;
-            //fEntities = world.fEntities;
             execute = new Default(this);
-            OnAwake();
+            OnCreate();
             OnInit();
         }
 
@@ -341,7 +381,7 @@ namespace Wargon.ezs {
             execute = new FrameSkip(value, this);
         }
 
-        public virtual void OnAwake() { }
+        protected virtual void OnCreate() { }
         public virtual void OnInit(){ }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -374,7 +414,7 @@ namespace Wargon.ezs {
             }
         }
         private class Default : IUpdateExecute {
-            private UpdateSystem system;
+            private readonly UpdateSystem system;
             public Default(UpdateSystem system) {
                 this.system = system;
             }
@@ -384,6 +424,14 @@ namespace Wargon.ezs {
             }
         }
     }
+    public struct DestroyEntityEvent { }
+    // public partial class DestroyEntitySystem : UpdateSystem {
+    //     public override void Update() {
+    //         entities.Each((Entity e, DestroyEntityEvent destroyEntityEvent) => {
+    //             e.Destroy();
+    //         });
+    //     }
+    // }
     
     public interface ISystemListener {
         void StartCheck();
@@ -391,5 +439,20 @@ namespace Wargon.ezs {
         void StartCheck(int index);
         void StopCheck(int index);
         bool Active(int index);
+    }
+    public partial class RemoveComponentSystem : UpdateSystem {
+        private readonly int typeID;
+        private EntityQuery query;
+        public RemoveComponentSystem(int type) => typeID = type;
+        public RemoveComponentSystem(Type type) => typeID = ComponentType.GetID(type);
+        protected override void OnCreate() {
+            query = world.GetQuery().With(typeID);
+        }
+        public override void Update() {
+            for (int index = 0; index < query.Count; index++) {
+                ref var e = ref query.GetEntity(index);
+                e.RemoveByTypeID(typeID);
+            }
+        }
     }
 }

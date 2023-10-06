@@ -1,12 +1,10 @@
-﻿using System.Collections;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using UnityEngine;
 
 namespace Wargon.ezs.Unity {
-    [DisallowMultipleComponent]
+    [DisallowMultipleComponent][DefaultExecutionOrder(-5)]
     public class MonoEntity : MonoBehaviour {
-        public TextAsset json;
         public Entity Entity;
         [SerializeReference] public List<object> Components = new List<object>();
         public bool runTime;
@@ -15,7 +13,8 @@ namespace Wargon.ezs.Unity {
         public int id;
         private bool converted;
         private World world;
-        public int ComponentsCount => runTime ? Entity.GetEntityData().componentTypes.Count : Components.Count;
+        private GameObject GO;
+        public int ComponentsCount => runTime ? Entity.GetEntityData().ComponentsCount : Components.Count;
         private void Start() {
             ConvertToEntity();
         }
@@ -39,13 +38,14 @@ namespace Wargon.ezs.Unity {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public virtual void ConvertToEntity() {
             if (converted) return;
+            GO = gameObject;
             Entity = MonoConverter.GetWorld().CreateEntity();
             world = Entity.World;
 #if UNITY_EDITOR
-            gameObject.name = $"{gameObject.name} ID:{Entity.id.ToString()}";
+            //gameObject.name = $"{gameObject.name} ID:{Entity.id.ToString()}";
 #endif
             id = Entity.id;
-            MonoConverter.Execute(Entity, Components);
+            MonoConverter.Execute(Entity, Components, this);
             converted = true;
             if (destroyComponent) Destroy(this);
             if (destroyObject) Destroy(gameObject);
@@ -53,12 +53,12 @@ namespace Wargon.ezs.Unity {
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ref T Get<T>() where T : new(){
+        public ref T Get<T>() where T : struct{
             return ref Entity.Get<T>();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Remove<T>() where T : new() {
+        public void Remove<T>() where T : struct {
             Entity.Remove<T>();
         }
 
@@ -68,7 +68,7 @@ namespace Wargon.ezs.Unity {
                 Enable();
             else
                 Disable();
-            gameObject.SetActive(state);
+            GO.SetActive(state);
         }
  
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -88,15 +88,15 @@ namespace Wargon.ezs.Unity {
 
         public void DestroyWithoutEntity() {
             destroyObject = true;
-            Destroy(gameObject);
+            Destroy(GO);
         }
     }
 
     [EcsComponent]
-    public class View {
+    public struct View {
         public MonoEntity Value;
     }
-
+    public struct EntityConvertedEvent {}
     public static class MonoEntityExtension {
         public static string ToJson(this MonoEntity monoEntity) {
             var components = monoEntity.Components;

@@ -11,7 +11,11 @@ namespace Wargon.ezs.Unity
            return EditorGUI.TextField(rect, $"element [{index}]", element as string);
         }
 
-        protected override object Draw(string fieldName, ref string field) {
+        protected override object DrawInternal(string fieldName, ref string field) {
+            return EditorGUILayout.TextField (fieldName, field);
+        }
+
+        protected override string DrawGenericInternal(string fieldName, ref string field) {
             return EditorGUILayout.TextField (fieldName, field);
         }
     }

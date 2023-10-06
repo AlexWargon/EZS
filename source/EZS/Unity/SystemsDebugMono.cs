@@ -51,7 +51,7 @@ namespace Wargon.ezs.Unity
             executeTimes = new double[systems.updateSystemsList.Count];
         }
 
-        public Systems Systems { get; }
+        public Systems Systems { [MethodImpl(MethodImplOptions.AggressiveInlining)] get; }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Active(int index) {
             return active[index];

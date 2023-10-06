@@ -10,8 +10,12 @@ namespace Wargon.ezs.Unity
             throw new System.NotImplementedException();
         }
 
-        protected override object Draw(string fieldName, ref Vector4 field)
+        protected override object DrawInternal(string fieldName, ref Vector4 field)
         {
+            return EditorGUILayout.Vector4Field($"    {fieldName}", field);
+        }
+
+        protected override Vector4 DrawGenericInternal(string fieldName, ref Vector4 field) {
             return EditorGUILayout.Vector4Field($"    {fieldName}", field);
         }
     }

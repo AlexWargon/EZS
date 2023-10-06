@@ -10,8 +10,12 @@ namespace Wargon.ezs.Unity
             throw new System.NotImplementedException();
         }
 
-        protected override object Draw(string fieldName, ref Color field)
+        protected override object DrawInternal(string fieldName, ref Color field)
         {
+            return EditorGUILayout.ColorField($"    {fieldName}", field);
+        }
+
+        protected override Color DrawGenericInternal(string fieldName, ref Color field) {
             return EditorGUILayout.ColorField($"    {fieldName}", field);
         }
     }

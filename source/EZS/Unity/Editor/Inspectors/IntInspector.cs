@@ -10,8 +10,12 @@ namespace Wargon.ezs.Unity
             return EditorGUI.IntField(rect, $"element [{index}]", (int)element);
         }
 
-        protected override object Draw(string fieldName, ref int field)
+        protected override object DrawInternal(string fieldName, ref int field)
         {
+            return EditorGUILayout.IntField($"    {fieldName}", field);
+        }
+
+        protected override int DrawGenericInternal(string fieldName, ref int field) {
             return EditorGUILayout.IntField($"    {fieldName}", field);
         }
     }

@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Reflection;
 
 namespace Wargon.ezs.Unity {
     public static class MonoConverter {
@@ -14,10 +13,12 @@ namespace Wargon.ezs.Unity {
         {
             return world;
         }
-        public static void Execute(Entity entity, List<object> components) {
+        public static void Execute(Entity entity, List<object> components, MonoEntity monoEntity = null) {
             foreach (var component in components) {
-                entity.AddBoxed(component);
+                if(component!=null)
+                    entity.AddBoxed(component);
             }
+            entity.Add(new EntityConvertedEvent());
         }
     }
 }

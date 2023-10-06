@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using UnityEditor;
-using UnityEngine;
+﻿using UnityEditor;
 
 namespace Wargon.ezs.Unity
 {
@@ -12,15 +9,8 @@ namespace Wargon.ezs.Unity
         
         static EzsDebugConfigs()
         {
-            Debug.Log("RELOADED");
             ComponentTypesList.Init();
             ComponentInspectorInternal.Init();
         }
-    }
-    [Serializable]
-    public class Context
-    {
-        public string TypeName;
-        public GUIStyle Style;
     }
 }

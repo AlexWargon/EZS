@@ -7,8 +7,7 @@ using Object = UnityEngine.Object;
 
 namespace Wargon.ezs.Unity
 {
-
-
+    
     public interface IComponentInspector
     {
         Type ComponentType { get;}

@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using UnityEditor;
 using UnityEngine;
 using UnityObject = UnityEngine.Object;
@@ -48,7 +49,14 @@ namespace Wargon.ezs.Unity
                 if (typeof(ITypeInspector).IsAssignableFrom(type) && type != typeof(TypeInspector<>) && !type.IsInterface)
                 {
                     var inspector = (ITypeInspector)Activator.CreateInstance(type);
-                    inspectors.Add(inspector.GetTypeOfField(), inspector);
+                    var fieldType = inspector.GetTypeOfField();
+                    if (fieldType == typeof(Enum) && type == typeof(EnumFlagInspector) ) {
+                        inspectors.Add(typeof(FlagsAttribute), inspector);
+                    }
+                    else {
+                        inspectors.Add(fieldType, inspector);
+                    }
+                    
                 }
                 else
                 if (typeof(IComponentInspector).IsAssignableFrom(type) && type != typeof(ComponentInspector<>) && !type.IsInterface)
@@ -109,16 +117,44 @@ namespace Wargon.ezs.Unity
             }
             return listInspecors[key];
         }
+
+        private static HashSet<int> maskCache;
+
+        public static void DrawComponentRun(MonoEntity entity, UnityObject obj, object component) {
+            Type type = component.GetType();
+            int componentTypeID = ComponentType.GetID(type);
+            IPool pool = entity.Entity.World.GetPoolByID(componentTypeID);
+            EntityGUI.Vertical(EntityGUI.GetColorStyleByType(type), () => { DrawRunTimeMode(entity, component, pool); });
+            if (remove) {
+                entity.Entity.RemoveByTypeID(componentTypeID);
+                remove = false;
+            }
+        }
+
+        public static void DrawComponentEditor(MonoEntity entity, UnityObject obj, object component, int index) {
+            Type type = component.GetType();
+            EntityGUI.Vertical(EntityGUI.GetColorStyleByType(type), () => { DrawEditorMode(entity, index); });
+            if (remove) {
+                if (entity.Components.HasType(type))
+                    entity.Components.RemoveAt(index);
+                EditorUtility.SetDirty(obj);
+                remove = false;
+            }
+        }
         public static void DrawComponentBox(MonoEntity entity, int index, MonoEntity[] manyEntities, int count, UnityObject target)
         {
             Count = count;
             if (entity.ComponentsCount < index) return;
             object component;
-            
+            int componentTypeID = 0;
             Type type;
             if (entity.runTime)
             {
-                var componentTypeID = entity.Entity.GetEntityData().componentTypes.ElementAt(index);
+                unsafe {
+                    ref var data = ref entity.Entity.GetEntityData();
+                    maskCache = data.archetype.Mask;
+                    componentTypeID = maskCache.ElementAt(index);
+                }
                 var pool = entity.Entity.World.GetPoolByID(componentTypeID);
                 component = pool.Get(entity.Entity.id);
                 type = pool.ItemType;
@@ -133,7 +169,7 @@ namespace Wargon.ezs.Unity
             }
 
             if (remove)
-                Remove(entity, index, manyEntities, target);
+                Remove(entity, index, manyEntities, target, componentTypeID);
         }
 
         private static void RemoveBtn()
@@ -159,7 +195,8 @@ namespace Wargon.ezs.Unity
         private static void DrawField(object fieldValue, string fieldName, Type fieldType, object component)
         {
             var isList = typeof(IList).IsAssignableFrom(fieldType);
-            var inspector = isList ? GetListInspector(fieldType.GetElementsType()) : fieldType.IsEnum ? GetInspector(typeof(Enum)) : GetInspector(fieldType);
+            var inspector = isList ? GetListInspector(fieldType.GetElementsType()) : 
+                fieldType.IsEnum ? (fieldType.GetCustomAttribute<FlagsAttribute>()) != null ? GetInspector(typeof(FlagsAttribute)) : GetInspector(typeof(Enum)) : GetInspector(fieldType);
             if (inspector != null)
             {
                 if (isList)
@@ -170,12 +207,12 @@ namespace Wargon.ezs.Unity
                         listInspector.SetTypeOfField(fieldType);
                         listInspector.SetTarget((IList)fieldValue);
                         listInspector.Init(fieldType.GetElementsType());
-                        fieldValue = listInspector.Render(fieldName, fieldValue);
+                        fieldValue = listInspector.Draw(fieldName, fieldValue);
                     }
                 }
                 else
                 {
-                    fieldValue = inspector.Render(fieldName, fieldValue);
+                    fieldValue = inspector.Draw(fieldName, fieldValue);
                 }
             }
             component.GetType().GetField(fieldName).SetValue(component, fieldValue);
@@ -204,7 +241,7 @@ namespace Wargon.ezs.Unity
             collection.GetType().GetProperty("Item")?.SetValue(collection, elementValue, new object[] { index });
         }
 
-        private static void Remove(MonoEntity entity, int index, MonoEntity[] manyEntities, UnityObject target)
+        private static void Remove(MonoEntity entity, int index, MonoEntity[] manyEntities, UnityObject target, int componentTypeID)
         {
             var type = entity.Components[index].GetType();
             if (Count > 1)
@@ -214,7 +251,7 @@ namespace Wargon.ezs.Unity
                     var e = manyEntities[i];
                     if (entity.runTime)
                     {
-                        e.Entity.RemoveByTypeID(e.Entity.GetEntityData().componentTypes.ElementAt(index));
+                        e.Entity.RemoveByTypeID(componentTypeID);
                         remove = false;
                     }
                     else
@@ -230,7 +267,7 @@ namespace Wargon.ezs.Unity
             {
                 if (entity.runTime)
                 {
-                    entity.Entity.RemoveByTypeID(entity.Entity.GetEntityData().componentTypes.ElementAt(index));
+                    entity.Entity.RemoveByTypeID(componentTypeID);
                     remove = false;
                 }
                 else
@@ -242,9 +279,9 @@ namespace Wargon.ezs.Unity
             }
         }
 
-        private static void Remove(Entity entity, int index)
+        private static void Remove(Entity entity, int index, int componentTypeID)
         {
-            entity.RemoveByTypeID(entity.GetEntityData().componentTypes.ElementAt(index));
+            entity.RemoveByTypeID(componentTypeID);
             remove = false;
         }
 
@@ -295,10 +332,9 @@ namespace Wargon.ezs.Unity
         }
 
 
-        public static void DrawComponentBox(Entity entity, int index)
+        public static void DrawComponentBox(Entity entity, int index, int componentTypeID)
         {
-            if (entity.GetEntityData().componentTypes.Count <= index) return;
-            var componentTypeID = entity.GetEntityData().componentTypes.ElementAt(index);
+            if (entity.GetEntityData().ComponentsCount<= index) return;
             var pool = entity.World.GetPoolByID(componentTypeID);
             var component = pool.Get(entity.id);
             var type = component.GetType();
@@ -306,7 +342,7 @@ namespace Wargon.ezs.Unity
                 () => { DrawRunTimeMode2(entity, component, type, pool); });
 
             if (remove)
-                Remove(entity, index);
+                Remove(entity, index, componentTypeID);
         }
 
         private static void DrawRunTimeMode2(Entity entity, object component, Type type, IPool pool)
@@ -367,6 +403,22 @@ namespace Wargon.ezs.Unity
         public static Type GetElementsType(this Type target)
         {
             return !target.IsArray ? target.GetGenericArguments()[0] : target.GetElementType();
+        }
+    }
+    public static class Log
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void Show(string massage)
+        {
+            Debug.Log(massage);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void Show(Color color, string massage)
+        {
+#if UNITY_EDITOR
+            Debug.Log($"<color=#{(byte) (color.r * 255f):X2}{(byte) (color.g * 255f):X2}{(byte) (color.b * 255f):X2}>{massage}</color>");
+#endif
         }
     }
 }

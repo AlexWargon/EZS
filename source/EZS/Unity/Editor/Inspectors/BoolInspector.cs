@@ -10,9 +10,13 @@ namespace Wargon.ezs.Unity
             throw new System.NotImplementedException();
         }
 
-        protected override object Draw(string fieldName, ref bool item)
+        protected override object DrawInternal(string fieldName, ref bool item)
         {
             return EditorGUILayout.Toggle($"    {fieldName}", item);
+        }
+
+        protected override bool DrawGenericInternal(string fieldName, ref bool field) {
+            return EditorGUILayout.Toggle($"    {fieldName}", field);
         }
     }
 }

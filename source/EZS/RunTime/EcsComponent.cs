@@ -1,6 +1,6 @@
 using System;
 [Serializable]
-[AttributeUsage(AttributeTargets.Struct | AttributeTargets.Class)]
+[AttributeUsage(AttributeTargets.Struct)]
 public sealed class EcsComponentAttribute : Attribute
 {
     public EcsComponentAttribute()

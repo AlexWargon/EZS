@@ -1,0 +1,4 @@
+﻿[EcsComponent]
+public struct PooledEvent
+{
+}

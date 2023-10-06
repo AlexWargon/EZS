@@ -23,7 +23,7 @@ namespace Wargon.ezs.Unity
             Object.DontDestroyOnLoad(worldDebug);
             worldDebug.world = world;
             worldDebug.transform.SetSiblingIndex(0);
-            Debug.Log($"systems count {world.GetSystemsCount()}");
+            //Debug.Log($"systems count {world.GetSystemsCount()}");
             for (var i = 0; i < world.GetSystemsCount(); i++)
             {
                 var systems = systemsPool[i];

@@ -28,7 +28,7 @@ namespace Wargon.ezs.Unity
         private void OnGUI()
         {
             var world = MonoConverter.GetWorld();
-            if (world == null)
+            if (world is not { Alive: true })
             {
                 GUILayout.Label("NO WORLDS");
 
@@ -44,7 +44,7 @@ namespace Wargon.ezs.Unity
         private void OnInspectorUpdate()
         {
             if (_world == null) return;
-            if (entityCountOld != _world.entitiesCount)
+            if (entityCountOld != _world.totalEntitiesCount)
                 Repaint();
         }
 
@@ -66,11 +66,11 @@ namespace Wargon.ezs.Unity
                 filterComponentsField.OnGUI(EditorGUILayout.GetControlRect(), filterComponentString);
             _world = world;
             var entities = _world.entities;
-            entityCountOld = _world.entitiesCount;
-            if (EntityDrawers.Count < _world.entitiesCount)
-                while (EntityDrawers.Count < _world.entitiesCount)
+            entityCountOld = _world.totalEntitiesCount;
+            if (EntityDrawers.Count < _world.totalEntitiesCount)
+                while (EntityDrawers.Count < _world.totalEntitiesCount)
                     EntityDrawers.Add(new EntityView(_world, OnFocusEntity));
-            for (var i = 0; i < _world.entitiesCount; i++)
+            for (var i = 0; i < _world.totalEntitiesCount; i++)
                 EntityDrawers[i].Draw(entities[i], filterComponentString);
         }
     }

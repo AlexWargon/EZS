@@ -7,11 +7,16 @@ namespace Wargon.ezs.Unity
     {
         public override object DrawCollectionElement(Rect rect, object element, int index)
         {
+            
             return null;
         }
 
-        protected override object Draw(string fieldName, ref AnimationCurve field)
+        protected override object DrawInternal(string fieldName, ref AnimationCurve field)
         {
+            return EditorGUILayout.CurveField($"    {fieldName}", field);
+        }
+
+        protected override AnimationCurve DrawGenericInternal(string fieldName, ref AnimationCurve field) {
             return EditorGUILayout.CurveField($"    {fieldName}", field);
         }
     }

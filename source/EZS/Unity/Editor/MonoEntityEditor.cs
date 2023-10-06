@@ -16,7 +16,6 @@ namespace Wargon.ezs.Unity {
         private GUIContent addComponentText;
         private GUIStyle addComponentButtonStyle;
         private Rect addButtonRect;
-        //private bool editMany;
         private int entitiesCount;
         private UnityEngine.Object currentDragObject = null;
 
@@ -36,15 +35,16 @@ namespace Wargon.ezs.Unity {
                 manyEntities[i] = (MonoEntity) targets[i];
             }
             monoEntity = (MonoEntity) targets[0];
-            if (GUILayout.Button("TEST JSON")) {
-                Debug.Log(monoEntity.ToJson());
-            }
-
-            monoEntity.json = EditorGUILayout.ObjectField("Json", monoEntity.json, typeof(TextAsset), true) as TextAsset;
-            if (GUILayout.Button("FROM JSON")) {
-                monoEntity.FromJson(monoEntity.json);
-            }
-            
+            // if (GUILayout.Button("TEST JSON")) {
+            //     Debug.Log(monoEntity.ToJson());
+            // }
+            //
+            // monoEntity.json = EditorGUILayout.ObjectField("Json", monoEntity.json, typeof(TextAsset), true) as TextAsset;
+            // if (GUILayout.Button("FROM JSON")) {
+            //     monoEntity.FromJson(monoEntity.json);
+            // }
+            if(monoEntity.runTime)
+                EditorGUILayout.LabelField($"{monoEntity.Entity.GetArchetype().ToString()}");
             
             EditorGUI.BeginChangeCheck();
             addComponentText = new GUIContent("Add Component");
@@ -181,10 +181,13 @@ namespace Wargon.ezs.Unity {
         private void AddComponentRuntime(string componentName, MonoEntity entity)
         {
             var type = GetComponentType(componentName);
-            if (entity.Entity.GetEntityData().componentTypes.Contains(ComponentTypeMap.GetID(type))) {
-                Debug.LogError($"ENTITY ALREADY HAS '{type}' COMPONENT");
-                return;
+            unsafe {
+                if (entity.Entity.GetEntityData().archetype.Mask.Contains(ComponentType.GetID(type))) {
+                    Debug.LogError($"ENTITY ALREADY HAS '{type}' COMPONENT");
+                    return;
+                }
             }
+
             
             var component= NewObject(type);
             entity.Entity.AddBoxed(component);
@@ -193,11 +196,25 @@ namespace Wargon.ezs.Unity {
 
         private void DrawComponents() 
         {
-            //Resolve(monoEntity);
-            for (var index = 0; index < monoEntity.ComponentsCount; index++)
-            {
-                ComponentInspectorInternal.DrawComponentBox(monoEntity, index, manyEntities, entitiesCount, target);
+            if (monoEntity.runTime) {
+                var archetype = monoEntity.Entity.GetArchetype();
+                foreach (var i in archetype.Mask) {
+                    var component = monoEntity.Entity.World.GetPoolByID(i).Get(monoEntity.id);
+                    ComponentInspectorInternal.DrawComponentRun(monoEntity, target, component);
+                }
             }
+            else {
+                for (var i = 0; i < monoEntity.ComponentsCount; i++) {
+                    var component = monoEntity.Components[i];
+                    if (component == null) return;
+                    ComponentInspectorInternal.DrawComponentEditor(monoEntity, target, component, i);
+                }
+            }
+            //Resolve(monoEntity);
+            // for (var index = 0; index < monoEntity.ComponentsCount; index++)
+            // {
+            //     ComponentInspectorInternal.DrawComponentBox(monoEntity, index, manyEntities, entitiesCount, target);
+            // }
         }
 
         private void Resolve(MonoEntity monoEntity)

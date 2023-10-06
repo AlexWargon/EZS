@@ -10,8 +10,12 @@ namespace Wargon.ezs.Unity
             return null;
         }
 
-        protected override object Draw(string fieldName, ref Gradient field)
+        protected override object DrawInternal(string fieldName, ref Gradient field)
         {
+            return EditorGUILayout.GradientField($"    {fieldName}", field);
+        }
+
+        protected override Gradient DrawGenericInternal(string fieldName, ref Gradient field) {
             return EditorGUILayout.GradientField($"    {fieldName}", field);
         }
     }

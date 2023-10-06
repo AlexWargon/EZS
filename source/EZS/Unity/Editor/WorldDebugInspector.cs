@@ -16,6 +16,8 @@ namespace Wargon.ezs.Unity
         private SearchField filterComponentsField;
         string filterComponentString;
         private bool showEntities;
+        private bool showArchetypes;
+        private bool showQueries;
         private void OnEnable()
         {
             filterComponentsField = new SearchField();
@@ -39,30 +41,65 @@ namespace Wargon.ezs.Unity
             var mb = floatMemory.ToStringNonAlloc("0.00");
             
             EditorGUILayout.LabelField($"RAM ALLOCATED : {mb} MB");
-            EditorGUILayout.LabelField($"Entity Count : {world.GetEntitiesCount().ToString()}");
+            EditorGUILayout.LabelField($"Total Entity Count : {world.GetTotalEntitiesCount().ToString()}");
+            EditorGUILayout.LabelField($"Alive Entity Count : {world.GetAliveEntntiesCount().ToString()}");
             EditorGUILayout.LabelField($"Free Entity Count : {world.GetFreeEntitiesCount().ToString()}");
+            EditorGUILayout.LabelField($"Archetypes Count : {world.ArchetypesCount().ToString()}");
             EditorGUILayout.LabelField($"Systems Count : {world.GetAllSystems()[0].updateSystemsList.Count.ToString()}");
             EditorGUILayout.Space();
-            DrawPools(world);
+            //DrawPools(world);
             EditorGUILayout.Space();
 
             showEntities = EditorGUILayout.Foldout(showEntities, "Entities");
+            showArchetypes = EditorGUILayout.Foldout(showArchetypes, "Archetypes");
+            showQueries = EditorGUILayout.Foldout(showQueries, "Queries");
             if (showEntities)
             {
                 filterComponentString = filterComponentsField.OnGUI(EditorGUILayout.GetControlRect(), filterComponentString);
 
                 var entities = world.entities;
 
-                if (EntityDrawers.Count < world.entitiesCount)
+                if (EntityDrawers.Count < world.totalEntitiesCount)
                 {
-                    while (EntityDrawers.Count < world.entitiesCount)
+                    while (EntityDrawers.Count < world.totalEntitiesCount)
                         EntityDrawers.Add(new EntityDrawer(world));
                 }
-                for (var i = 1; i < world.entitiesCount; i++)
+                for (var i = 1; i < world.totalEntitiesCount; i++)
                 {
                     EntityDrawers[i].Draw(entities[i],filterComponentString);
                 }
             }
+            
+            if (showArchetypes) {
+                var archetypes = world.GetAllArchetypes();
+                for (var i = 0; i < archetypes.Count; i++) {
+                    ref var archetype = ref archetypes.Items[i];
+                    EditorGUILayout.LabelField($"Archetype ID : {archetype.ID}");
+                    // unsafe {
+                    //     for (int j = 0; j < archetype.QueriesCount; j++) {
+                    //         var q = archetype.Queries.ElementAt(i);
+                    //         EditorGUILayout.LabelField(q->ToString());
+                    //     }
+                    // }
+                    
+                    // foreach (var i1 in archetype.Mask) {
+                    //     var type = ComponentType.GetTypeValue(i1);
+                    //     EntityGUI.Vertical(EntityGUI.GetColorStyleByType(type), () => {
+                    //         EditorGUILayout.LabelField($"{type.Name}");
+                    //     });
+                    // }
+                }
+            }
+
+            if (showQueries) {
+                var qs = world.GetAllQueries();
+
+                for (int i = 0; i < qs.Count; i++) {
+                    EditorGUILayout.LabelField(qs.Items[i].ToString());
+                    EditorGUILayout.LabelField($"Count:{qs.Items[i].Count}");
+                }
+            }
+
         }
 
         private void DrawPools(World world)
@@ -73,8 +110,8 @@ namespace Wargon.ezs.Unity
                 if (pools[i] != null)
                 {
                     EditorGUILayout.LabelField("_________________________________________________________");
-                    EditorGUILayout.LabelField($" Pool<{ComponentTypeMap.GetTypeByID(pools[i].TypeID).Name}>.Size  : {pools[i].GetSize()}");
-                    EditorGUILayout.LabelField($" Pool<{ComponentTypeMap.GetTypeByID(pools[i].TypeID).Name}>.Count : {pools[i].Count}");
+                    EditorGUILayout.LabelField($" Pool<{ComponentType.GetTypeValue(pools[i].TypeID).Name}>.Size  : {pools[i].GetSize()}");
+                    EditorGUILayout.LabelField($" Pool<{ComponentType.GetTypeValue(pools[i].TypeID).Name}>.Count : {pools[i].Count}");
                 }
             }
         }
@@ -103,14 +140,15 @@ namespace Wargon.ezs.Unity
         {
             name = $" ID:{entity.id}";
             ref var data = ref entity.GetEntityData();
-            foreach (var dataComponentType in data.componentTypes)
-            {
-                var pool = world.GetPoolByID(dataComponentType);
-                var component = pool.Get(entity.id);
-                if(component!= null)
-                    name += $"; {component.GetType()}";
+            unsafe {
+                foreach (var dataComponentType in data.archetype.Mask)
+                {
+                    var pool = world.GetPoolByID(dataComponentType);
+                    var component = pool.Get(entity.id);
+                    if(component!= null)
+                        name += $"; {component.GetType()}";
+                }
             }
-
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private bool Has(string filter)
@@ -138,14 +176,19 @@ namespace Wargon.ezs.Unity
         public static void Draw(Entity entity)
         {
             ref var data = ref entity.GetEntityData();
-            var componentsCount = data.componentsCount;
+            var componentsCount = data.ComponentsCount;
             GUILayout.BeginVertical(GUI.skin.box);
             
             GUILayout.Label($"Entity ID :{entity.id}");
             //EditorGUILayout.LabelField($"Entity ID : {entity.id.ToString()}");
             EditorGUILayout.LabelField($"ECS Components : [{componentsCount}]", EditorStyles.boldLabel);
-            for(var index = 0; index < componentsCount; index++)
-                ComponentInspectorInternal.DrawComponentBox(entity, index);
+            unsafe {
+                var index = 0;
+                foreach (var componentTypeID in data.archetype.Mask) {
+                    ComponentInspectorInternal.DrawComponentBox(entity, index, componentTypeID);
+                    index++;
+                }
+            }
             GUILayout.EndVertical();
         }
     }

@@ -3,171 +3,47 @@ using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 
 namespace Wargon.ezs {
-    
-    public partial struct fEntities {
-        private readonly World world;
-        private int[] entityTypesMap;
-        private EntityType[] entityTypesArray;
-        private fEntities[] Withouts;
-        private bool[] entityTypesActives;
-        private bool[] wthoutsActives;
-        private readonly int[] WITHOUT_TYPES;
-        private readonly bool isHasWithout;
-        private int CountEX;
-        private int EntityTypesCount;
-        private readonly Dictionary<int, fEntities> withOwners;
-        private int currentOwnerId;
 
-
-        public fEntities(World world, bool without = false) {
-            isHasWithout = without;
-            entityTypesMap = new int[64];
-            entityTypesArray = new EntityType[world.EntityTypesCachSize];
-            entityTypesActives = new bool[world.EntityTypesCachSize];
-            Withouts = without ? null : new fEntities[world.EntityTypesCachSize];
-            wthoutsActives = without ? null : new bool[world.EntityTypesCachSize];
-            EntityTypesCount = 0;
-            CountEX = 0;
-            WITHOUT_TYPES = isHasWithout ? new int[3] : null;
-            this.world = world;
-
-            currentOwnerId = 0;
-            withOwners = new Dictionary<int, fEntities>();
-        }
-
-        public fEntities WithOwner(int id) {
-            return GetWithOwners(id);
-        }
-
-        private fEntities GetWithOwners(int id) {
-            if (withOwners.TryGetValue(id, out fEntities value)) {
-                
-                return value;
-            }
-            var entities = new fEntities(world) {currentOwnerId = id};
-            var pool = world.GetPool<Owner>();
-            pool.OnAdd += entities.OnAddOwner;
-            pool.OnRemove += entities.OnRemoveOwner;
-            withOwners.Add(id, entities);
-            return withOwners[id];
-        }
+    public struct EntitiesEach {
         
-        private void OnAddWithoutOnEntity(int id) {
-            for (var i = 0; i < EntityTypesCount; i++) entityTypesArray[entityTypesMap[i]].UpdateOnAddWithout(id);
-        }
-        private void OnRemoveWithoutToEntity(int id) {
-            ref var data = ref world.GetEntityData(id);
-            for (var i = 0; i < CountEX; i++)
-                if (data.componentTypes.Contains(WITHOUT_TYPES[i]))
-                    return;
-            for (var i = 0; i < EntityTypesCount; i++) entityTypesArray[entityTypesMap[i]].UpdateOnRemoveWithout(in data);
-        }
-        private void OnAddOwner(int id) {
-            if(world.GetPool<Owner>().items[id].value.id != currentOwnerId) return;
-            OnRemoveWithoutToEntity(id);
-        }
-
-        private void OnRemoveOwner(int id) {
-            OnAddWithoutOnEntity(id);
-        }
-        
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ref fEntities Without<T1>() where T1 : new() {
-            return ref GetWithout<Without<T1>>();
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ref fEntities Without<T1, T2>() where T1 : new() where T2 : new() {
-            return ref GetWithout<Without<T1, T2>>();
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ref fEntities Without<T1, T2, T3>() where T1 : new() where T2 : new() where T3 : new() {
-            return ref GetWithout<Without<T1, T2, T3>>();
-        }
-        
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public EntityQuery<TWith> GetEntityType<TWith>() where TWith : struct, IFilter {
-            var id = FilterIDWith<TWith>.ID;
-            CollectionHelp.ValidateEntityTypes(ref entityTypesArray, ref entityTypesActives, id);
-            
-            if (entityTypesActives[id] == false) {
-                var newEntityType = new EntityQuery<TWith>(world);
-                if (isHasWithout)
-                    for (var i = 0; i < CountEX; i++)
-                        newEntityType.Without(WITHOUT_TYPES[i]);
-                world.OnCreateEntityType(newEntityType);
-                entityTypesArray[id] = newEntityType;
-                CollectionHelp.ValidateArray(ref entityTypesMap, EntityTypesCount);
-                entityTypesMap[EntityTypesCount] = id;
-                entityTypesActives[id] = true;
-                EntityTypesCount++;
-            }
-            return entityTypesArray[id] as EntityQuery<TWith>;
-        }
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private ref fEntities GetWithout<TWithout>() where TWithout : struct, IFilter, IChacheID {
-            var id = FilterIDWithout<TWithout>.ID;
-            CollectionHelp.ValidateEntityTypes(ref Withouts, ref wthoutsActives, id);
-            if (wthoutsActives[id] == false) {
-                var newEntities = new fEntities(world, true) {CountEX = FilterIDWithout<TWithout>.TypesInFilter};
-                for (var i = 0; i < newEntities.CountEX; i++) {
-                    newEntities.WITHOUT_TYPES[i] = FilterIDWithout<TWithout>.Types[i];
-                    var pool = world.GetPoolByID(newEntities.WITHOUT_TYPES[i]);
-                    pool.OnAdd += newEntities.OnAddWithoutOnEntity;
-                    pool.OnRemove += newEntities.OnRemoveWithoutToEntity;
-                }
-                Withouts[id] = newEntities;
-                wthoutsActives[id] = true;
-            }
-            return ref Withouts[id];
-        }
-
-        private struct FilterIDWith<TWith> where TWith : struct, IFilter {
-            public static int ID;
-
-            static FilterIDWith() {
-                ID = EntityTypesIDCount.Count++;
-            }
-        }
-
-        private struct FilterIDWithout<TWithout> where TWithout : struct, IFilter, IChacheID {
-            public static readonly int ID;
-            public static readonly int TypesInFilter;
-            public static readonly int[] Types;
-
-            static FilterIDWithout() {
-                ID = EntityTypesWithoutIDCount.Count++;
-                TypesInFilter = typeof(TWithout).GenericTypeArguments.Length;
-                new TWithout().Cache(ref Types);
-            }
-        }
-
-        public struct EntityTypesIDCount {
-            public static int Count;
-        }
-
-        public struct EntityTypesWithoutIDCount {
-            public static int Count;
-        }
     }
 
+    public static partial class EntitiesExtensions {
+        public static EntitiesEach Without<T1>(this EntitiesEach entities) where T1 : new() {
+            return entities;
+        }
+        public static EntitiesEach Without<T1, T2>(this EntitiesEach entities) where T1 : new() where T2 : new() {
+            return entities;
+        }
+        public static EntitiesEach Without<T1, T2, T3>(this EntitiesEach entities) where T1 : new() where T2 : new() where T3 : new() {
+            return entities;
+        }
+
+        public static EntitiesEach WithOwner(this EntitiesEach entities, int id) {
+            return entities;
+        }
+        public static EntitiesEach WithOwner(this EntitiesEach entities, Entity entity) {
+            return entities;
+        }
+        public static EntitiesEach WithJob(this EntitiesEach entities) {
+            return entities;
+        }
+        public static EntitiesEach WithJobParallel(this EntitiesEach entities) {
+            return entities;
+        }
+    }
 
     #region FILTERS
 
     public interface IFilter {
         public void Setup(EntityType entityQuery, World world);
     }
-
-    public interface IFilterWithout {
-        public void Setup(ref fEntities entities, World world);
-    }
     public interface IChacheID {
         void Cache(ref int[] cache);
     }
 
     public struct With<T1> : IFilter
-        where T1 : new() {
+        where T1 : struct {
         public Pool<T1> pool1;
         public void Setup(EntityType entityQuery, World world) {
             entityQuery.IncludeTypes[entityQuery.IncludeCount] = ComponentType<T1>.ID;
@@ -179,8 +55,8 @@ namespace Wargon.ezs {
     }
 
     public struct With<T1, T2> : IFilter
-        where T1 : new()
-        where T2 : new() {
+        where T1 : struct
+        where T2 : struct {
         public Pool<T1> pool1;
         public Pool<T2> pool2;
         private EntityType query;
@@ -202,9 +78,9 @@ namespace Wargon.ezs {
     }
 
     public struct With<T1, T2, T3> : IFilter
-        where T1 : new()
-        where T2 : new()
-        where T3 : new() {
+        where T1 : struct
+        where T2 : struct
+        where T3 : struct {
         public Pool<T1> pool1;
         public Pool<T2> pool2;
         public Pool<T3> pool3;
@@ -232,10 +108,10 @@ namespace Wargon.ezs {
     }
 
     public struct With<T1, T2, T3, T4> : IFilter
-        where T1 : new()
-        where T2 : new()
-        where T3 : new()
-        where T4 : new() {
+        where T1 : struct
+        where T2 : struct
+        where T3 : struct
+        where T4 : struct {
         public Pool<T1> pool1;
         public Pool<T2> pool2;
         public Pool<T3> pool3;
@@ -269,11 +145,11 @@ namespace Wargon.ezs {
     }
 
     public struct With<T1, T2, T3, T4, T5> : IFilter
-        where T1 : new()
-        where T2 : new()
-        where T3 : new()
-        where T4 : new()
-        where T5 : new() {
+        where T1 : struct
+        where T2 : struct
+        where T3 : struct
+        where T4 : struct
+        where T5 : struct {
         public Pool<T1> pool1;
         public Pool<T2> pool2;
         public Pool<T3> pool3;
@@ -314,12 +190,12 @@ namespace Wargon.ezs {
     }
 
     public struct With<T1, T2, T3, T4, T5, T6> : IFilter
-        where T1 : new()
-        where T2 : new()
-        where T3 : new()
-        where T4 : new()
-        where T5 : new()
-        where T6 : new() {
+        where T1 : struct
+        where T2 : struct
+        where T3 : struct
+        where T4 : struct
+        where T5 : struct
+        where T6 : struct {
         public Pool<T1> pool1;
         public Pool<T2> pool2;
         public Pool<T3> pool3;
@@ -373,13 +249,13 @@ namespace Wargon.ezs {
     }
 
     public struct With<T1, T2, T3, T4, T5, T6, T7> : IFilter
-        where T1 : new()
-        where T2 : new()
-        where T3 : new()
-        where T4 : new()
-        where T5 : new()
-        where T6 : new()
-        where T7 : new() {
+        where T1 : struct
+        where T2 : struct
+        where T3 : struct
+        where T4 : struct
+        where T5 : struct
+        where T6 : struct
+        where T7 : struct {
         public Pool<T1> pool1;
         public Pool<T2> pool2;
         public Pool<T3> pool3;
@@ -440,14 +316,14 @@ namespace Wargon.ezs {
     }
 
     public struct With<T1, T2, T3, T4, T5, T6, T7, T8> : IFilter
-        where T1 : new()
-        where T2 : new()
-        where T3 : new()
-        where T4 : new()
-        where T5 : new()
-        where T6 : new()
-        where T7 : new()
-        where T8 : new() {
+        where T1 : struct
+        where T2 : struct
+        where T3 : struct
+        where T4 : struct
+        where T5 : struct
+        where T6 : struct
+        where T7 : struct
+        where T8 : struct {
         public Pool<T1> pool1;
         public Pool<T2> pool2;
         public Pool<T3> pool3;
@@ -515,15 +391,15 @@ namespace Wargon.ezs {
     }
 
     public struct With<T1, T2, T3, T4, T5, T6, T7, T8, T9> : IFilter
-        where T1 : new()
-        where T2 : new()
-        where T3 : new()
-        where T4 : new()
-        where T5 : new()
-        where T6 : new()
-        where T7 : new()
-        where T8 : new()
-        where T9 : new() {
+        where T1 : struct
+        where T2 : struct
+        where T3 : struct
+        where T4 : struct
+        where T5 : struct
+        where T6 : struct
+        where T7 : struct
+        where T8 : struct
+        where T9 : struct {
         public Pool<T1> pool1;
         public Pool<T2> pool2;
         public Pool<T3> pool3;
@@ -598,16 +474,16 @@ namespace Wargon.ezs {
     }
 
     public struct With<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> : IFilter
-        where T1 : new()
-        where T2 : new()
-        where T3 : new()
-        where T4 : new()
-        where T5 : new()
-        where T6 : new()
-        where T7 : new()
-        where T8 : new()
-        where T9 : new()
-        where T10 : new() {
+        where T1 : struct
+        where T2 : struct
+        where T3 : struct
+        where T4 : struct
+        where T5 : struct
+        where T6 : struct
+        where T7 : struct
+        where T8 : struct
+        where T9 : struct
+        where T10 : struct {
         public Pool<T1> pool1;
         public Pool<T2> pool2;
         public Pool<T3> pool3;
@@ -801,15 +677,41 @@ namespace Wargon.ezs {
     }
 
     #endregion
-    
+
+    public class Query : EntityType {
+        public Query(World world) : base(world) { }
+
+        public Query With(int id) {
+
+            IncludeTypes[IncludeCount] = id;
+            var pool1 = world.GetPoolByID(id);
+            pool1.OnAdd += OnAddInclude;
+            pool1.OnRemove += OnRemoveInclude;
+            IncludeCount++;
+            return this;
+        }
+
+        public Query Without(int id) {
+            var pool1 = world.GetPoolByID(id);
+            pool1.OnAdd += OnAddExclude;
+            pool1.OnRemove += OnRemoveExclude;
+            ExcludeCount++;
+            return this;
+        }
+
+        public Query Push() {
+            world.OnCreateEntityType(this);
+            return this;
+        }
+    } 
     public class EntityQuery<TWith> : EntityType where TWith : struct, IFilter {
-        public TWith with;
+        protected TWith with;
         public EntityQuery(World world) : base(world) {
             with = new TWith();
             with.Setup(this, world);
         }
 
-        public EntityQuery<TWith> Without<T>() where T : new() {
+        public EntityQuery<TWith> Without<T>() where T : struct {
             ExcludeTypes[ExcludeCount] = ComponentType<T>.ID;
             var pool1 = world.GetPool<T>();
             pool1.OnAdd += OnAddExclude;
@@ -825,12 +727,12 @@ namespace Wargon.ezs {
             pool1.OnRemove += OnRemoveExclude;
             ExcludeCount++;
         }
+        public void Push(){
+            world.OnCreateEntityType(this);
+        }
+
     }
-    [EcsComponent]
-    public struct Owner
-    {
-        public Entity value;
-    }
+
     public class OwnerQuery<TWith> : EntityQuery<TWith> where TWith : struct, IFilter {
         private readonly int ownerID;
         private readonly Pool<Owner> pool;
@@ -849,7 +751,7 @@ namespace Wargon.ezs {
             with.Setup(this, world);
         }
         
-        public new OwnerQuery<TWith> Without<T>() where T : new() {
+        public new OwnerQuery<TWith> Without<T>() where T : struct {
             ExcludeTypes[ExcludeCount] = ComponentType<T>.ID;
             var pool1 = world.GetPool<T>();
             pool1.OnAdd += OnAddExclude;
@@ -862,8 +764,8 @@ namespace Wargon.ezs {
         internal override void Add(int id)
         {
             if (HasEntity(id)) return;
-            if(pool.items[id].value.id != ownerID) return;
-            if (entities.Length == Count) Array.Resize(ref entities, world.entitiesCount+2);
+            if(pool.items[id].Value.id != ownerID) return;
+            if (entities.Length == Count) Array.Resize(ref entities, world.totalEntitiesCount+2);
             entities[Count] = id;
             entitiesMap.Add(id, Count);
             Count++;
@@ -871,17 +773,17 @@ namespace Wargon.ezs {
         public override void OnAddInclude(int id)
         {
             if (HasEntity(id)) return;
-            if(pool.items[id].value.id != ownerID) return;
+            if(pool.items[id].Value.id != ownerID) return;
             ref var data = ref world.GetEntityData(id);
-            for (var i = 0; i < ExcludeCount; i++)
-                if (data.componentTypes.Contains(ExcludeTypes[i]))
-                    return;
+            // for (var i = 0; i < ExcludeCount; i++)
+            //     if (data.componentTypes.Contains(ExcludeTypes[i]))
+            //         return;
+            //
+            // for (var i = 0; i < IncludeCount; i++)
+            //     if (!data.componentTypes.Contains(IncludeTypes[i]))
+            //         return;
 
-            for (var i = 0; i < IncludeCount; i++)
-                if (!data.componentTypes.Contains(IncludeTypes[i]))
-                    return;
-
-            if (entities.Length == Count) Array.Resize(ref entities, world.entitiesCount+2);
+            if (entities.Length == Count) Array.Resize(ref entities, world.totalEntitiesCount+2);
             entities[Count] = data.id;
             entitiesMap.Add(data.id, Count);
             Count++;
@@ -921,17 +823,17 @@ namespace Wargon.ezs {
         public override void OnRemoveExclude(int id)
         {
             if (HasEntity(id)) return;
-            if(pool.items[id].value.id != ownerID) return;
+            if(pool.items[id].Value.id != ownerID) return;
             ref var data = ref world.GetEntityData(id);
-            for (var i = 0; i < ExcludeCount; i++)
-                if (data.componentTypes.Contains(ExcludeTypes[i]))
-                    return;
+            // for (var i = 0; i < ExcludeCount; i++)
+            //     if (data.componentTypes.Contains(ExcludeTypes[i]))
+            //         return;
+            //
+            // for (var i = 0; i < IncludeCount; i++)
+            //     if (!data.componentTypes.Contains(IncludeTypes[i]))
+            //         return;
 
-            for (var i = 0; i < IncludeCount; i++)
-                if (!data.componentTypes.Contains(IncludeTypes[i]))
-                    return;
-
-            if (entities.Length == Count) Array.Resize(ref entities, world.entitiesCount+2);
+            if (entities.Length == Count) Array.Resize(ref entities, world.totalEntitiesCount+2);
             entities[Count] = data.id;
             entitiesMap.Add(data.id, Count);
             Count++;

@@ -30,13 +30,18 @@ namespace Wargon.ezs.Unity
             }
             ref var data = ref Entity.GetEntityData();
 
-            var componentsCount = data.componentsCount;
+            var componentsCount = data.ComponentsCount;
             GUILayout.BeginVertical(GUI.skin.box);
 
             //EditorGUILayout.LabelField($"Entity ID : {entity.id.ToString()}");
             EditorGUILayout.LabelField($"Components : [{componentsCount}]", EditorStyles.boldLabel);
-            for (var index = 0; index < componentsCount; index++)
-                ComponentInspectorInternal.DrawComponentBox(Entity, index);
+            unsafe {
+                var index = 0;
+                foreach (var componentTypeID in data.archetype.Mask) {
+                    ComponentInspectorInternal.DrawComponentBox(Entity, index, componentTypeID);
+                    index++;
+                }
+            }
             GUILayout.EndVertical();
         }
     }
@@ -65,13 +70,16 @@ namespace Wargon.ezs.Unity
         {
             name = $" ID:{entity.id}";
             data = entity.GetEntityData();
-            foreach (var dataComponentType in data.componentTypes)
-            {
-                var pool = world.GetPoolByID(dataComponentType);
-                var component = pool.Get(entity.id);
-                if (component != null)
-                    name += $"; {component.GetType()}";
+            unsafe {
+                foreach (var dataComponentType in data.archetype.Mask)
+                {
+                    var pool = world.GetPoolByID(dataComponentType);
+                    var component = pool.Get(entity.id);
+                    if (component != null)
+                        name += $"; {component.GetType()}";
+                }
             }
+
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

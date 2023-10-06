@@ -1,0 +1,16 @@
+{
+    "name": "EZSUnity",
+    "rootNamespace": "",
+    "references": [
+        "GUID:bf13737622ae9074bb70c7b01500f994"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
