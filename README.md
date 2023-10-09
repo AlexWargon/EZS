@@ -5,7 +5,7 @@
 
 C# Entity Component System (ECS) based on struct components
 
-Inspired by [LeoECS](https://github.com/Leopotam/ecs) and [Entities](https://docs.unity3d.com/Packages/com.unity.entities@0.17/manual/index.html)
+Inspired by [Entities](https://docs.unity3d.com/Packages/com.unity.entities@0.17/manual/index.html)
 
 # How install:
 Just copy source folder in assets folder of your game
@@ -89,13 +89,13 @@ public struct Health
 //Update systems must be partial, because the framework uses a source generator now.
 public partial class UpdateExampleSystem : UpdateSystem 
 {
-    public override void Update() 
-    {
-        entities.Each((Entity entity, Heal heal, Health health) => 
+        public override void Update() 
         {
-                //some logic
-        });
-    }
+                entities.Each((Entity entity, Heal heal, Health health) => 
+                {
+                        //some logic
+                });
+        }
 }
 ```
 
@@ -104,20 +104,20 @@ public partial class UpdateExampleSystem : UpdateSystem
 //Call system when component added to some entity
 public class DamageSystem : OnAdd<Damaged> 
 {
-    public override void Execute(in Enitity entity) 
-    {
-        //some logic
-    }
+        public override void Execute(in Enitity entity) 
+        {
+                //some logic
+        }
 }
 ```
 ```C#
 //Call system when component removed from some entity
 public class OnRemoveSystem : OnRemove<SomeComponent> 
 {
-    public override void Execute(in Enitity entity) 
-    {
-        //some logic
-    }
+        public override void Execute(in Enitity entity) 
+        {
+                //some logic
+        }
 }
 ```
 
@@ -126,13 +126,13 @@ public class OnRemoveSystem : OnRemove<SomeComponent>
 //Call system at start of world live
 public class InitExampleSystem : InitSystem
 {
-    public override void Execute() 
-    {
-        entities.Each((Entity entity, ref Health heath, ref Damaged damage) => 
+        public override void Execute() 
         {
-            //some logic
-        });
-    }
+                entities.Each((Entity entity, ref Health heath, ref Damaged damage) => 
+                {
+                    //some logic
+                });
+        }
 }
 ```
 
@@ -141,13 +141,13 @@ public class InitExampleSystem : InitSystem
 //Call system during the destruction of the world
 public class DestroyExampleSystem : DestroySystem
 {
-    public override void Execute() 
-    {
-        entities.Each((Health heath, Damaged damage) => 
+        public override void Execute() 
         {
-            //some logic
-        });
-    }
+                entities.Each((Health heath, Damaged damage) => 
+                {
+                        //some logic
+                });
+        }
 }
 ```
 # System Loops: Each, EachThreaded, Without:
@@ -157,13 +157,13 @@ public class DestroyExampleSystem : DestroySystem
 
 public partial class SingleThreadExampleUpdateSystem : UpdateSystem 
 {
-    public override void Update() 
-    {
-        entities.Each((Rigidbody rb, BoxCollider box) => 
+        public override void Update() 
         {
-            //some logic
-        });
-    }
+                entities.Each((Rigidbody rb, BoxCollider box) => 
+                {
+                        //some logic
+                });
+        }
 }
 
 ```
@@ -174,14 +174,31 @@ public partial class SingleThreadExampleUpdateSystem : UpdateSystem
 
 public partial class MultiThreadExampleUpdateSystem  : UpdateSystem 
 {
-    public override void Update() 
-    {
-        //ref keyword if you use struct as component
-        entities.EachThreaded((Position pos, RayCast ray, Impact impact, CanReflect reflect, BossTag tag) => 
+        private EntityQuery query;
+        private Pool<Data> pool;
+        protected override void OnCreate() {
+            query = world.GetPool<Data>();
+        }
+        public override void Update() 
         {
-            //some logic
-        });
-    }
+                var job = new TestJob
+                {
+                        nativeQuery = query.AsNative(),
+                        nativePool = pool.AsNative()
+                };
+                job.Schedule(query.Count, 1).Complete();
+        }
+        [BurstCompile]
+        struct TestJob : IJobParallelFor
+        {
+                public NativeQuery nativeQuery;
+                public NativePool<Data> nativePool;
+                public void Execute(int index)
+                {
+                        var entity = nativeQuery.GetEntity(index);
+                        ref var data = ref nativePool.Get(entity);
+                }
+        }
 }
 
 ```
@@ -189,38 +206,36 @@ public partial class MultiThreadExampleUpdateSystem  : UpdateSystem
 ```C#
 public partial class WithoutSystemExample  : UpdateSystem 
 {
-    public override void Update() 
-    {
-        //ref keyword if you use struct as component
-        entities.Without<UnActive, PlayerTag>().EachThreaded((Position pos, RayCast ray, Impact impact, CanReflect reflect, BossTag tag) => 
+        public override void Update() 
         {
-            //some logic
-        });
-        
-        entities.Without<UnActive, PlayerTag>().Each((Rigidbody rb, BoxCollider box) => 
-        {
-            //some logic
-        });
-    }
+                //ref keyword if you use struct as component
+                entities.Without<UnActive, PlayerTag>().EachThreaded((Position pos, RayCast ray, Impact impact, CanReflect reflect, BossTag tag) => 
+                {
+                        //some logic
+                });
+                
+                entities.Without<UnActive, PlayerTag>().Each((Rigidbody rb, BoxCollider box) => 
+                {
+                        //some logic
+                });
+        }
 }
 ```
 4. WithOwner
 ```C#
 public partial class AbilityExampleSystem  : UpdateSystem 
 {
-    public override void Update() 
-    {
-        entities.Each((Bullet bullet, CollisionEvent collision, Owner owner) => 
+        public override void Update() 
         {
-                // WithOwner take as parameter id of owner entity
-                entities.WithOwner(owner.id).Each((ExplosionOnCollisionAbility ability) => 
+                entities.Each((Bullet bullet, CollisionEvent collision, Owner owner) => 
                 {
-                        //some logic
+                        // WithOwner take as parameter id of owner entity
+                        entities.WithOwner(owner.id).Each((ExplosionOnCollisionAbility ability) => 
+                        {
+                                //some logic
+                        });
                 });
-        });
-
-        
-    }
+        }
 }
 ```
 
