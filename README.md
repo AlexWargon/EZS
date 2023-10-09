@@ -65,7 +65,7 @@ entity.Get<Health>()
 entity.Remove<Health>()
 
 //check is entity alive or destroyed
-entity.IsDead();
+entity.IsNull();
 
 //destroy entity
 entity.Destroy();
