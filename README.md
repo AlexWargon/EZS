@@ -167,10 +167,8 @@ public partial class SingleThreadExampleUpdateSystem : UpdateSystem
 }
 
 ```
-2. entities.EachThreaded((..........)=>{.....});
+2. Jobs
 ```C#
-//same think like entities.Each(()=>), but use all threads of CPU.
-//p.s. it won't work with unity object types like Transform, GameObject, Rigidbody and others :C
 
 public partial class MultiThreadExampleUpdateSystem  : UpdateSystem 
 {
