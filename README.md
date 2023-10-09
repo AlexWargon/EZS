@@ -150,7 +150,7 @@ public class DestroyExampleSystem : DestroySystem
         }
 }
 ```
-# System Loops: Each, EachThreaded, Without:
+# System Loops: Each, Jobs, Without:
 1. entities.Each((..........)=>{....});
 ```C#
 //execute logic for each entity that has the components specified in it
