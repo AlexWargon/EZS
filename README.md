@@ -238,6 +238,16 @@ public partial class AbilityExampleSystem  : UpdateSystem
         }
 }
 ```
+# How systems filter entities:
+Each entity has its own archetype. As many components as an entity has, there are as many components in an archetype. When we add/remove component form entity or change it's owner, the entity changes its archetype and marking as dirty. After execution of system it will be placed in matching queries, and removed from that are not matching.
+
+```C#
+var query = world.GetQuery().With<EnemyTag>().Without<PlayerTag>();
+var entity = world.CreateEntity(); // empty archetype
+entity.Add(new EnemyTag()) // archetype(EnemyTag). Our entity match with our query, after system executin it will be added to our query.
+entity.Add(new PlayerTag()) // archetype(EnemyTag,PlayerTag). Now our entity not matching our query. and entity won't be added to it. 
+
+```
 
 # Unity Integration:
 Entity Wrapper
