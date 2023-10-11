@@ -59,7 +59,7 @@ entity.Add(new Health{ value = 100 });
 entity.Has<Health>()
 
 //get component
-entity.Get<Health>()
+ref var health = ref entity.Get<Health>()
 
 //remove component
 entity.Remove<Health>()
@@ -193,6 +193,7 @@ public partial class MultiThreadExampleUpdateSystem  : UpdateSystem
                 public NativePool<Data> nativePool;
                 public void Execute(int index)
                 {
+                        //when we work with entities from Jobs, entities representing as integer (Int32)
                         var entity = nativeQuery.GetEntity(index);
                         ref var data = ref nativePool.Get(entity);
                 }
