@@ -34,15 +34,15 @@ systemsLate.Init();
 ```
 Call update of systems in your update loop
 ```C#
-private void GameUpdateLoop()
+private void Update()
 {
     systems.OnUpdate();
 }
-private void GameFixedUpdateLoop()
+private void FixedUpdate()
 {
     systemsFixed.OnUpdate();
 }
-private void GameLateUpdateLoop()
+private void LateUpdate()
 {
     systemsLate.OnUpdate();
 }
