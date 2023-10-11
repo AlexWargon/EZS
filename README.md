@@ -175,7 +175,8 @@ public partial class MultiThreadExampleUpdateSystem  : UpdateSystem
         private EntityQuery query;
         private Pool<Data> pool;
         protected override void OnCreate() {
-            query = world.GetPool<Data>();
+                query = world.GetQuery().With<Data>();
+                pool = world.GetPool<Data>();
         }
         public override void Update() 
         {
