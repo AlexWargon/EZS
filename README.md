@@ -24,7 +24,9 @@ systems .Add(new PlayerMoveSystem())  //Add update/init/destroy system
 //You can use multiple Systems objects with one world
 var systemsFixed = new Systems(world);
 var systemsLate = new Systems(world);
+#if UNITY_EDITOR
 var debug = new DebugInfo(world); // Turn on debug
+#endif
 systems.Init();
 systemsFixed.Init();
 systemsLate.Init();
