@@ -8,7 +8,7 @@ namespace Wargon.ezs.Unity
     [CustomEditor(typeof(SystemsDebugMono))]
     public class SystemsDebugInspector : Editor
     {
-        private const int SYSTEM_MONITOR_DATA_LENGTH = 40;
+        private const int SYSTEM_MONITOR_DATA_LENGTH = 140;
         private static bool showSystemsMonitor = true;
         private int lastRenderedFrameCount;
         private GUIContent pauseButtonContent;
@@ -19,12 +19,6 @@ namespace Wargon.ezs.Unity
         private SystemsDebugMono systemsDebugMono;
         private Graph systemsMonitor;
         private SystemView[] systemViews;
-
-
-        private void Awake()
-        {
-            DebugUpdate.Redraw += UpdateNameTime;
-        }
 
         private void OnEnable()
         {
@@ -94,18 +88,19 @@ namespace Wargon.ezs.Unity
                 var systemType = systemsDebug.Systems.updateSystemsList[i].GetType();
                 system.name = systemType.Name;
                 system.timems = systemsDebug.executeTimes[i];
-                system.SetNewTime(system.timems);
+                if(systemType == typeof(RemoveComponentSystem)) continue;
+                //system.SetNewTime(system.timems);
                 EditorGUILayout.BeginHorizontal(GUI.skin.box);
-
+                
                 if (systemType.IsDefined(typeof(SystemColorAttribute), false)) {
                     systemsDebug.active[i] = EditorGUILayout.Toggle(systemsDebug.active[i]);
                     DrawSystemWithColor(systemType, ref system);
                 }
-                else
+                else if(systemType != typeof(RemoveComponentSystem))
                 {
                     systemsDebug.active[i] = EditorGUILayout.Toggle(systemsDebug.active[i]);
                     EditorGUILayout.LabelField(system.name);
-                    EditorGUILayout.LabelField($"{(system.timems/* > 0.002 ? system.time : 0.000*/): 0.000} ms, av {system.GetAvarage() : 0.000} ms");
+                    EditorGUILayout.LabelField($"{(system.timems > 0.001 ? system.timems : 0.000): 0.000} ms");
                 }
 
                 EditorGUILayout.EndHorizontal();
@@ -116,7 +111,7 @@ namespace Wargon.ezs.Unity
             var atribute = (SystemColorAttribute) Attribute.GetCustomAttribute(systemType, typeof(SystemColorAttribute));
             var style = new GUIStyle(EditorStyles.textField) {normal = {textColor = atribute.color}};
             EditorGUILayout.LabelField(system.name, style);
-            EditorGUILayout.LabelField($"{(system.timems/* > 0.002 ? system.time : 0.000*/): 0.000} ms, av {system.GetAvarage() : 0.000} ms", style);
+            EditorGUILayout.LabelField($"{(system.timems/* > 0.002 ? system.time : 0.000*/): 0.000} ms", style);
         }
 
         private SystemView[] SortByTime(SystemView[] array)

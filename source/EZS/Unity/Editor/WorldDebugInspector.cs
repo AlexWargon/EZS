@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
-
+using System.Text;
 using UnityEditor;
 using UnityEditor.IMGUI.Controls;
 using UnityEngine;
@@ -18,6 +18,7 @@ namespace Wargon.ezs.Unity
         private bool showEntities;
         private bool showArchetypes;
         private bool showQueries;
+        private Vector2 scrollPos;
         private void OnEnable()
         {
             filterComponentsField = new SearchField();
@@ -49,25 +50,27 @@ namespace Wargon.ezs.Unity
             EditorGUILayout.Space();
             //DrawPools(world);
             EditorGUILayout.Space();
-
+            filterComponentString = filterComponentsField.OnGUI(EditorGUILayout.GetControlRect(), filterComponentString);
             showEntities = EditorGUILayout.Foldout(showEntities, "Entities");
             showArchetypes = EditorGUILayout.Foldout(showArchetypes, "Archetypes");
             showQueries = EditorGUILayout.Foldout(showQueries, "Queries");
-            if (showEntities)
-            {
-                filterComponentString = filterComponentsField.OnGUI(EditorGUILayout.GetControlRect(), filterComponentString);
-
+            if (showEntities) {
                 var entities = world.entities;
-
-                if (EntityDrawers.Count < world.totalEntitiesCount)
+                EditorGUILayout.BeginVertical();
+                scrollPos = EditorGUILayout.BeginScrollView(scrollPos);
+                var eCount = Screen.height / 20;
+                if (EntityDrawers.Count < eCount)
                 {
                     while (EntityDrawers.Count < world.totalEntitiesCount)
                         EntityDrawers.Add(new EntityDrawer(world));
                 }
-                for (var i = 1; i < world.totalEntitiesCount; i++)
+                for (var i = 1; i < eCount; i++)
                 {
                     EntityDrawers[i].Draw(entities[i],filterComponentString);
                 }
+                EditorGUILayout.EndScrollView();
+                EditorGUILayout.EndVertical();
+                GUILayout.FlexibleSpace();
             }
             
             if (showArchetypes) {
@@ -135,20 +138,25 @@ namespace Wargon.ezs.Unity
             buttonStyle.fixedHeight = 20f;
 
             name = string.Empty;
+            _stringBuilder = new StringBuilder();
         }
+
+        private readonly StringBuilder _stringBuilder;
         private void EntityToString(Entity entity)
         {
-            name = $" ID:{entity.id}";
+            _stringBuilder.Append($" ID:{entity.id}");
             ref var data = ref entity.GetEntityData();
-            unsafe {
-                foreach (var dataComponentType in data.archetype.Mask)
-                {
-                    var pool = world.GetPoolByID(dataComponentType);
-                    var component = pool.Get(entity.id);
-                    if(component!= null)
-                        name += $"; {component.GetType()}";
+            foreach (var dataComponentType in data.archetype.Mask)
+            {
+                var pool = world.GetPoolByID(dataComponentType);
+                var component = pool.GetBoxed(entity.id);
+                if (component != null) {
+                    name += $"; {component.GetType()}";
+                    _stringBuilder.Append($"; {component.GetType()}");
                 }
             }
+            name = _stringBuilder.ToString();
+            _stringBuilder.Clear();
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private bool Has(string filter)
@@ -161,7 +169,7 @@ namespace Wargon.ezs.Unity
         {
             if(!Has(filter)) return;
             if (name == String.Empty)
-                EntityToString(entity);
+                name = $"e:{entity.id}";
             if (GUILayout.Button(name, buttonStyle))
             {
                 toggled = !toggled;
@@ -182,12 +190,10 @@ namespace Wargon.ezs.Unity
             GUILayout.Label($"Entity ID :{entity.id}");
             //EditorGUILayout.LabelField($"Entity ID : {entity.id.ToString()}");
             EditorGUILayout.LabelField($"ECS Components : [{componentsCount}]", EditorStyles.boldLabel);
-            unsafe {
-                var index = 0;
-                foreach (var componentTypeID in data.archetype.Mask) {
-                    ComponentInspectorInternal.DrawComponentBox(entity, index, componentTypeID);
-                    index++;
-                }
+            var index = 0;
+            foreach (var componentTypeID in data.archetype.Mask) {
+                ComponentInspectorInternal.DrawComponentBox(entity, index, componentTypeID);
+                index++;
             }
             GUILayout.EndVertical();
         }

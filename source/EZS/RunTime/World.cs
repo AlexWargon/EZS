@@ -1,5 +1,6 @@
 ﻿
 using Unity.Collections;
+using UnityEngine;
 
 namespace Wargon.ezs
 {
@@ -46,6 +47,7 @@ namespace Wargon.ezs
     public struct OwnerNative {
         public int id;
     }
+    public struct EntityConvertedEvent {}
     public partial class World
     {
         public int ID;
@@ -56,8 +58,9 @@ namespace Wargon.ezs
         public Entity[] entities;
         public Entities Entities;
         private IPool[] ComponentPools;
-
         private int poolsAmount;
+        private Dictionary<Type, IEventBuffer> EventBuffers;
+        private int eventBuffersAmount;
         public int totalEntitiesCount;
         public int aliveEntitiesCount;
         public bool Alive;
@@ -82,38 +85,23 @@ namespace Wargon.ezs
             systems = new Systems[4];
             Entities = new Entities(this);
             Alive = true;
+
+            EventBuffers = new Dictionary<Type, IEventBuffer>(8);
+            eventBuffersAmount = 0;
             
             GetPool<DestroyEntity>();
             ownerPool = GetPool<Owner>();
             ownerNativePool = GetPool<OwnerNative>();
             CreateFirstArchetype();
+            var zeroE = CreateEntity();
+            zeroE.Add(new Owner(){Value = new Entity(){id = -99999, version = -99999, World = this}});
+
         }
 
         private readonly Pool<Owner> ownerPool;
         private readonly Pool<OwnerNative> ownerNativePool;
         internal Pool<Owner> OwnerPool => ownerPool;
         internal Pool<OwnerNative> OwnerNativePool => ownerNativePool;
-        
-
-        // private Query[] dirtyQueries;
-        // private ArrayList<Query> queries;
-        // private int dirtyCount;
-        // public void AddDirtyQuery(Query added) {
-        //     dirtyQueries[dirtyCount] = added;
-        //     dirtyCount++;
-        // }
-        //
-        // public void UpdateDirtyQueries() {
-        //     for (var i = 0; i < dirtyCount; i++) {
-        //         dirtyQueries[i].Update();
-        //     }
-        // }
-        //
-        // public Query GetQuery() {
-        //     var query = new Query(this);
-        //     queries.Add(query);
-        //     return query;
-        // }
 
         public int GetSystemsCount() => systemsCount;
         public void AddSystems(Systems add)
@@ -128,11 +116,40 @@ namespace Wargon.ezs
         {
             return systems;
         }
+
+        public T GetSystem<T>() where T : UpdateSystem {
+            for (int i = 0; i < systemsCount; i++) {
+                ref var s = ref systems[i];
+                for (int j = 0; j < s.updateSystemsList.Count; j++) {
+                    ref var system = ref s.updateSystemsList.Items[j];
+                    if (system is T TS)
+                        return TS;
+                }
+            }
+
+            throw new Exception($"System of type {typeof(T).Name} is not initialized on not exist");
+        }
+        internal object GetSystem(Type type) {
+            for (int i = 0; i < systemsCount; i++) {
+                ref var s = ref systems[i];
+                for (int j = 0; j < s.updateSystemsList.Count; j++) {
+                    ref var system = ref s.updateSystemsList.Items[j];
+                    if (system.GetType().Name == type.Name)
+                        return system;
+                }
+            }
+
+            throw new Exception($"System of type {type.Name} is not initialized on not exist");
+        }
         public void Destroy()
         {
             for (var i = 0; i < systemsCount; i++)
             {
                 systems[i].Destroy();
+            }
+            for (int i = 0; i < poolsAmount-1; i++) {
+                ref var pool = ref ComponentPools[i];
+                pool?.Dispose();
             }
             OnDestroy?.Invoke();
             OnDestroy = null;
@@ -289,6 +306,26 @@ namespace Wargon.ezs
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public IPool[] GetAllPoolsInternal() {
             return ComponentPools;
+        }
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public EventBuffer<T> GetBuffer<T>()  where T: struct, IEvent {
+            var type = typeof(T);
+            if (EventBuffers.TryGetValue(type, out var buffer))
+                return (EventBuffer<T>)buffer;
+            buffer = new EventBuffer<T>(128);
+            EventBuffers.Add(type, buffer);
+            return (EventBuffer<T>)buffer;
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal IEventBuffer GetBuffer(Type type) {
+            if (EventBuffers.TryGetValue(type, out var buffer))
+                return buffer;
+            var bufferType = typeof(EventBuffer<>);
+            var fullType = bufferType.MakeGenericType(type);
+            buffer = (IEventBuffer) Activator.CreateInstance(fullType, 128);
+            EventBuffers.Add(type, buffer);
+            return buffer;
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ref Entity GetEntity(int id)

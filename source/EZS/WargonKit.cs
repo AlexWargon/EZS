@@ -49,7 +49,7 @@ namespace Wargon
         public static float value => Random.value;
 
         // RANDOM ARRAY
-        public static T[] RandomArray<T>(T[] arrayOne, T[] arrayTwo)
+        public static T[] RandomArray<T>(this T[] arrayOne, T[] arrayTwo)
         {
             var values = new List<T[]> {arrayOne, arrayTwo};
             var randomIndex = Random.Range(0, values.Count);
@@ -57,7 +57,7 @@ namespace Wargon
         }
 
         // RANDOM LIST
-        public static List<T> RandomArray<T>(List<T> arrayOne, List<T> arrayTwo)
+        public static List<T> RandomArray<T>(this List<T> arrayOne, List<T> arrayTwo)
         {
             var values = new List<List<T>> {arrayOne, arrayTwo};
             var randomIndex = Random.Range(0, values.Count);
@@ -71,13 +71,14 @@ namespace Wargon
         }
 
         // RANDOM OBJECT FROM ARRAY OF ANY TYPE
-        public static T RandomFromArray<T>(T[] array)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static T GetRandomElement<T>(this T[] array)
         {
             var randomIndex = Random.Range(0, array.Length-1);
             return array[randomIndex];
         }
 
-        public static T RandomFromArray<T>(List<T> array)
+        public static T RandomElement<T>(List<T> array)
         {
             var randomIndex = Random.Range(0, array.Count-1);
             return array[randomIndex];
@@ -155,6 +156,11 @@ namespace Wargon
             return new Vector2(
                 aPoint.x * c - aPoint.y * s,
                 aPoint.y * c + aPoint.x * s);
+        }
+
+        public static Vector3 RandomVector3(float range1, float range2) {
+            return new Vector3(Random.Range(range1, range2), Random.Range(range1, range2),
+                Random.Range(range1, range2));
         }
     }
     

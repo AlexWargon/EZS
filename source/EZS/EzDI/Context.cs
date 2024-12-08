@@ -36,17 +36,24 @@ namespace Wargon.DI
             var fields = type.GetFields(bindingFlags);
             foreach (var fieldInfo in fields)
             {
-                if (FieldHasAttribute(fieldInfo))
-                {
-                    var diType = DiType.New;
-                    if (di.HasGlobal(fieldInfo.FieldType))
-                        diType = DiType.Global;
-                    else if (di.HasSingle(fieldInfo.FieldType))
-                        diType = DiType.Single;
+                // if (FieldHasAttribute(fieldInfo))
+                // {
+                //     var diType = DiType.New;
+                //     if (di.HasGlobal(fieldInfo.FieldType))
+                //         diType = DiType.Global;
+                //     else if (di.HasSingle(fieldInfo.FieldType))
+                //         diType = DiType.Single;
+                //
+                //     fieldsToInject.Add((fieldInfo.Name, fieldInfo.FieldType, diType));
+                //     //Log.Show(new Color(0.98f, 0.42f, 1f), $"Field [{fieldInfo.FieldType}] of [{contextType.Name}] added like must be injected");
+                // }
+                var diType = DiType.New;
+                if (di.HasGlobal(fieldInfo.FieldType))
+                    diType = DiType.Global;
+                else if (di.HasSingle(fieldInfo.FieldType))
+                    diType = DiType.Single;
 
-                    fieldsToInject.Add((fieldInfo.Name, fieldInfo.FieldType, diType));
-                    //Log.Show(new Color(0.98f, 0.42f, 1f), $"Field [{fieldInfo.FieldType}] of [{contextType.Name}] added like must be injected");
-                }
+                fieldsToInject.Add((fieldInfo.Name, fieldInfo.FieldType, diType));
             }
         }
 
@@ -57,7 +64,7 @@ namespace Wargon.DI
 
         public void Inject<T>(T obj) where T : class
         {
-            if(binded) return;
+            //if(binded) return;
             for (var i = 0; i < fieldsToInject.Count; i++)
             {
                 switch (fieldsToInject[i].Item3)
@@ -65,18 +72,18 @@ namespace Wargon.DI
                     case DiType.New:
                         if(di.HasSingle(fieldsToInject[i].Item2)) 
                             contextType.GetField(fieldsToInject[i].Item1,bindingFlags)?.SetValue(obj, di.GetContainer(fieldsToInject[i].Item2).Get());
-                        else Debug.LogError($"{fieldsToInject[i].Item1} can't be inhected. There no isntance in DI");
+                        //else Debug.LogError($"{fieldsToInject[i].Item1} can't be inhected. There no isntance in DI");
 
                         break;
                     case DiType.Single:
                         if(di.HasSingle(fieldsToInject[i].Item2))
                             contextType.GetField(fieldsToInject[i].Item1,bindingFlags)?.SetValue(obj, di.GetContainer(fieldsToInject[i].Item2).Get());
-                        else Debug.LogError($"{fieldsToInject[i].Item1} can't be inhected. There no isntance in DI");
+                        //else Debug.LogError($"{fieldsToInject[i].Item1} can't be inhected. There no isntance in DI");
                         break;
                     case DiType.Global:
                         if(di.HasGlobal((fieldsToInject[i].Item2)))
                             contextType.GetField(fieldsToInject[i].Item1,bindingFlags)?.SetValue(obj, DependencyContainer.Globals[fieldsToInject[i].Item2]);
-                        else Debug.LogError($"{fieldsToInject[i].Item1} can't be inhected. There no isntance in DI");
+                        //else Debug.LogError($"{fieldsToInject[i].Item1} can't be inhected. There no isntance in DI");
                         break;
                 }
                 //Log.Show(new Color(0.49f, 0.62f, 1f), $"Field [{fieldsToInject[i].Item2}] Binded to [{contextType.Name}]");
@@ -89,7 +96,7 @@ namespace Wargon.DI
                 constructor.Invoke(obj, newParams);
             }
             //Log.Show(Color.yellow, $"[{contextType}] Binded");
-            binded = true;
+            //binded = true;
         }
     }
 }

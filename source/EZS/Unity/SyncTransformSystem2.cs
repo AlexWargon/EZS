@@ -19,9 +19,10 @@
                 ref var transformComponent = ref transformPure.items[index];
                 // transformComponent.right = transformComponent.rotation * UnityEngine.Vector3.right;
                 // transformComponent.forward = transformComponent.rotation * UnityEngine.Vector3.forward;
-                transformRef.value.position = transformComponent.position;
+                transformRef.value.localPosition = transformComponent.position;
                 transformRef.value.rotation = transformComponent.rotation;
                 transformRef.value.localScale = transformComponent.scale;
+                
             }
         }
     }

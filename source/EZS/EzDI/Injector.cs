@@ -18,10 +18,9 @@ namespace Wargon.DI
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void AddAsSingle<T>(T toInject) where T : class => GetOrCreate().AddAsSingle(toInject);
 
-        public static void GetAsSignle<T>() where T : class => GetOrCreate().GetSingle<T>();
+        public static T GetAsSignle<T>() where T : class => GetOrCreate().GetSingle<T>();
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void AddAsGlobal<T>(T toInject) where T : class => GetOrCreate().AddAsGlobal(toInject);
-
         public static void Dispose() => GetOrCreate().Dispose();
         public static void DisposeAll() => GetOrCreate().DisposeAll();
     }

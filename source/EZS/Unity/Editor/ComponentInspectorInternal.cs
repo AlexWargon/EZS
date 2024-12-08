@@ -28,7 +28,7 @@ namespace Wargon.ezs.Unity
             scriptsAssets = new Dictionary<Type, TextAsset>();
             componentInspectors = new Dictionary<Type, IComponentInspector>();
             csFileExist = new Dictionary<Type, bool>();
-            CrateInspectors();
+            CreateInspectors();
             FillScriptAssets();
             inited = true;
         }
@@ -40,7 +40,7 @@ namespace Wargon.ezs.Unity
                 AddScirptAsset(types[i]);
             }
         }
-        private static void CrateInspectors()
+        private static void CreateInspectors()
         {
             var assembly = Assembly.GetAssembly(typeof(ITypeInspector));
             
@@ -119,8 +119,9 @@ namespace Wargon.ezs.Unity
         }
 
         private static HashSet<int> maskCache;
-
+        public static MonoEntity currentEntity;
         public static void DrawComponentRun(MonoEntity entity, UnityObject obj, object component) {
+            currentEntity = entity;
             Type type = component.GetType();
             int componentTypeID = ComponentType.GetID(type);
             IPool pool = entity.Entity.World.GetPoolByID(componentTypeID);
@@ -132,6 +133,7 @@ namespace Wargon.ezs.Unity
         }
 
         public static void DrawComponentEditor(MonoEntity entity, UnityObject obj, object component, int index) {
+            currentEntity = entity;
             Type type = component.GetType();
             EntityGUI.Vertical(EntityGUI.GetColorStyleByType(type), () => { DrawEditorMode(entity, index); });
             if (remove) {
@@ -156,7 +158,7 @@ namespace Wargon.ezs.Unity
                     componentTypeID = maskCache.ElementAt(index);
                 }
                 var pool = entity.Entity.World.GetPoolByID(componentTypeID);
-                component = pool.Get(entity.Entity.id);
+                component = pool.GetBoxed(entity.Entity.id);
                 type = pool.ItemType;
                 EntityGUI.Vertical(EntityGUI.GetColorStyleByType(type), () => { DrawRunTimeMode(entity, component, pool); });
             }
@@ -182,17 +184,17 @@ namespace Wargon.ezs.Unity
         private static void DrawTypeField(object component, FieldInfo field)
         {
             var fieldValue = field.GetValue(component);
-            EntityGUI.Horizontal(() => DrawField(fieldValue, field.Name,  field.FieldType, component));
+            EntityGUI.Horizontal(() => DrawField(fieldValue, field.Name,  field.FieldType, component, field));
         }
 
         private static void DrawTypeFieldRunTime(object component, FieldInfo field)
         {
             if (component == null) return;
             var fieldValue = field.GetValue(component);
-            EntityGUI.Horizontal(() => DrawField(fieldValue, field.Name, field.FieldType, component));
+            EntityGUI.Horizontal(() => DrawField(fieldValue, field.Name, field.FieldType, component, field));
         }
 
-        private static void DrawField(object fieldValue, string fieldName, Type fieldType, object component)
+        private static void DrawField(object fieldValue, string fieldName, Type fieldType, object component, FieldInfo fieldInfo)
         {
             var isList = typeof(IList).IsAssignableFrom(fieldType);
             var inspector = isList ? GetListInspector(fieldType.GetElementsType()) : 
@@ -210,8 +212,7 @@ namespace Wargon.ezs.Unity
                         fieldValue = listInspector.Draw(fieldName, fieldValue);
                     }
                 }
-                else
-                {
+                else {
                     fieldValue = inspector.Draw(fieldName, fieldValue);
                 }
             }
@@ -241,7 +242,7 @@ namespace Wargon.ezs.Unity
             collection.GetType().GetProperty("Item")?.SetValue(collection, elementValue, new object[] { index });
         }
 
-        private static void Remove(MonoEntity entity, int index, MonoEntity[] manyEntities, UnityObject target, int componentTypeID)
+        private static void Remove(MonoEntity entity, int index, IReadOnlyList<MonoEntity> manyEntities, UnityObject target, int componentTypeID)
         {
             var type = entity.Components[index].GetType();
             if (Count > 1)
@@ -336,7 +337,7 @@ namespace Wargon.ezs.Unity
         {
             if (entity.GetEntityData().ComponentsCount<= index) return;
             var pool = entity.World.GetPoolByID(componentTypeID);
-            var component = pool.Get(entity.id);
+            var component = pool.GetBoxed(entity.id);
             var type = component.GetType();
             EntityGUI.Vertical(EntityGUI.GetColorStyleByType(type),
                 () => { DrawRunTimeMode2(entity, component, type, pool); });

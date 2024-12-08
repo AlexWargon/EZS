@@ -74,7 +74,7 @@ namespace Wargon.ezs.Unity
                 foreach (var dataComponentType in data.archetype.Mask)
                 {
                     var pool = world.GetPoolByID(dataComponentType);
-                    var component = pool.Get(entity.id);
+                    var component = pool.GetBoxed(entity.id);
                     if (component != null)
                         name += $"; {component.GetType()}";
                 }

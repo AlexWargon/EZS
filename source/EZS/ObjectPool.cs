@@ -1,58 +1,124 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
-using System.IO;
 using System.Runtime.CompilerServices;
-using System.Runtime.Serialization;
-using System.Runtime.Serialization.Formatters.Binary;
 using UnityEngine;
 using Wargon.ezs;
 using Wargon.ezs.Unity;
 using Object = UnityEngine.Object;
 
-public class ObjectPool : MonoBehaviour {
+public class ObjectPool {
 
     private const int POOL_MINIMUM_SIZE = 4;
     public const int POOL_INCREACE_SIZE = 32;
-    private const int POOL_DEFAULT_SIZE = 128;
+    private const int POOL_DEFAULT_SIZE = 32;
     public const int POOL_MAXIMUM_SIZE = 512;
-    private static ObjectPool instance;
-    public static Vector3 UnActivePos = new Vector3(-100000f, -100000f, 0);
-    [SerializeField] private List<PoolContainer> poolContainers = new List<PoolContainer>();
-    private readonly Dictionary<int, Queue<Entity>> entityPool = new Dictionary<int, Queue<Entity>>();
-
-    public static void Clear() {
-        Instance.entityPool.Clear();
-        instance.poolContainers.Clear();
-    }
     
+    public static Vector3 UnActivePos = new Vector3(-100000f, -100000f, 0);
+    private readonly List<PoolContainer> poolContainers = new List<PoolContainer>();
+    private readonly Dictionary<int, Queue<Entity>> entityPool = new Dictionary<int, Queue<Entity>>();
+    public List<MonoEntity> poolObj;
+    private GameObject root;
+    private static ObjectPool instance;
     private static ObjectPool Instance
     {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         get
         {
-            if (instance == null) instance = FindObjectOfType<ObjectPool>();
-
-            if (instance == null)
-            {
-                instance = new GameObject().AddComponent<ObjectPool>();
-                instance.transform.position = new Vector3(1000, 1000, 0);
-                instance.name = "POOLS";
-            }
-
+            if (instance != null) return instance;
+            instance = new ObjectPool {
+                root = new GameObject("POOLS_ROOT") {
+                    transform = {
+                        position = new Vector3(1000, 1000, 0)
+                    }
+                }
+            };
+            // instance = FindObjectOfType<ObjectPool>();
+            // if (instance == null && !clearing)
+            // {
+            //     instance = new GameObject().AddComponent<ObjectPool>();
+            //     instance.transform.position = new Vector3(1000, 1000, 0);
+            //     instance.name = "POOLS";
+            // }
             return instance;
         }
     }
-
     
     #region ENTITY POOL
 
-    private int maxCallPerFrame = 2;
-
+    public static void Clear() {
+        if(instance is null) return;
+        Instance.entityPool.Clear();
+        Instance.poolContainers.Clear();
+        instance = null;
+    }
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Queue<Entity> GetPool(int poolKey) {
-        return instance.entityPool[poolKey];
+        return Instance.entityPool[poolKey];
     }
-    
+
+    private World _world;
+    private Pool<Lifetime> lifeTimePool;
+    private Pool<Pooled> pooledPool;
+    public static void Create(World world) {
+        Instance._world = world;
+        instance.lifeTimePool = world.GetPool<Lifetime>();
+        instance.pooledPool = world.GetPool<Pooled>();
+    }
+
+    private PoolCommand Command;
+    private const int MAX_INSTATIATE_PER_FRAME = 64;
+    private int instatiatePerFrameCounter = 0;
+    private ref Entity ReuseEntityAsyncInternal(MonoEntity prefab, Vector3 position, Quaternion rotation) {
+        var poolKey = prefab.GetInstanceID();
+        if (entityPool.ContainsKey(poolKey)) {
+            var e = entityPool[poolKey].Dequeue();
+            var command = new PoolCommand.Command { entity = e, prefab = poolKey, pos = position, rotation = rotation, CommandType = PoolCommand.CommandType.Pool};
+            Command.Buffer.Add(command);
+            ref var poolObject = ref e.GetRef<Pooled>();
+            poolObject.Reuse(position, rotation);
+            if(entityPool[poolKey].Count < 0)
+                AddPoolSizeAsync(prefab, 16, poolObject.containerIndex);
+            return ref Command.Buffer.Items[Command.Buffer.Count-1].entity;
+        }
+        CreateEntityPool(prefab, POOL_DEFAULT_SIZE);
+        return ref ReuseEntityNonStatic(prefab, position, rotation);
+    }
+    private void AddPoolSizeAsync(MonoEntity prefab, int addPoolSize, int containerIndex)
+    {
+        var poolKey = prefab.GetInstanceID();
+
+        if (entityPool.ContainsKey(poolKey))
+        {
+            
+            var poolHolder = poolContainers[containerIndex];
+            for (var i = 0; i < addPoolSize; i++)
+            {
+                var newEntity = Object.Instantiate(prefab);
+                newEntity.ConvertToEntity();
+                ref var newObject = ref pooledPool.Get(newEntity.id);
+                newObject.containerIndex = containerIndex;
+                newObject.poolKey = poolKey;
+                newObject.transform = newObject.mono.transform;
+                newObject.gameObject = newObject.mono.gameObject;
+                newObject.SetParent(poolHolder.transform);
+#if UNITY_EDITOR
+                newObject.SetName($"[PoolObject] {prefab.name} ID:{newObject.mono.id.ToString()}");
+                //Log.Show(Color.yellow, "Pool added");
+#endif
+                newObject.SetActive(false);
+                poolHolder.Add();
+                instatiatePerFrameCounter++;
+            }
+        }
+    }
+    private void ExecuteBuffer() {
+        for (var i = 0; i < instatiatePerFrameCounter; i++) {
+            ref var cmd = ref Command.Buffer.GetLastWithDecrement();
+            ref var poolObject = ref pooledPool.Get(cmd.entity.id);
+            poolObject.Reuse(cmd.pos, cmd.rotation);
+        }
+
+    }
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void CreateEntityPool(MonoEntity prefab, int poolSize)
     {
@@ -68,12 +134,14 @@ public class ObjectPool : MonoBehaviour {
         {
             entityPool.Add(poolKey, new Queue<Entity>());
 
-            var poolHolder = new PoolContainer(new GameObject(),
-                poolSize, prefab.name, poolKey, poolContainers.Count) {transform = {parent = transform}};
+            var poolHolder = new PoolContainer(new GameObject(), poolSize, prefab.name, poolKey, poolContainers.Count)
+            {
+                transform = {parent = root.transform},
+            };
             poolContainers.Add(poolHolder);
             for (var i = 0; i < poolSize; i++)
             {
-                var newEntity = Instantiate(prefab);
+                var newEntity = Object.Instantiate(prefab);
                 newEntity.ConvertToEntity();
                 ref var pooled = ref newEntity.Entity.Get<Pooled>();
                 pooled.poolKey = poolKey;
@@ -103,9 +171,9 @@ public class ObjectPool : MonoBehaviour {
             poolContainers.Add(poolHolder);
             for (var i = 0; i < poolSize; i++)
             {
-                var newEntity = Instantiate(prefab);
-                newEntity.ConvertToEntity();
-                ref var pooled = ref newEntity.Entity.Get<Pooled>();
+                var newEntity = Object.Instantiate(prefab);
+                var e = newEntity.ConvertToEntity();
+                ref var pooled = ref e.Get<Pooled>();
                 pooled.poolKey = poolKey;
                 pooled.transform = pooled.mono.transform;
                 pooled.gameObject = pooled.mono.gameObject;
@@ -122,13 +190,13 @@ public class ObjectPool : MonoBehaviour {
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Entity ReuseEntity(MonoEntity prefab, Vector3 position)
+    public static Entity ReuseView(MonoEntity prefab, Vector3 position)
     {
         return Instance.ReuseEntityNonStatic(prefab, position, Quaternion.identity);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static ref Entity ReuseEntity(MonoEntity prefab, Vector3 position, Quaternion rotation)
+    public static ref Entity ReuseView(MonoEntity prefab, Vector3 position, Quaternion rotation)
     {
         return ref Instance.ReuseEntityNonStatic(prefab, position, rotation);
     }
@@ -141,10 +209,9 @@ public class ObjectPool : MonoBehaviour {
         if (entityPool.ContainsKey(poolKey)) {
             var e = entityPool[poolKey].Dequeue();
             
-            ref var poolObject = ref e.Get<Pooled>();
-            
+            ref var poolObject = ref e.GetRef<Pooled>();
             poolObject.Reuse(position, rotation);
-            if(entityPool[poolKey].Count < POOL_MINIMUM_SIZE)
+            if(entityPool[poolKey].Count < 2)
                 AddPoolSize(prefab, 16, poolObject.containerIndex);
             return ref poolObject.mono.Entity;
         }
@@ -190,7 +257,7 @@ public class ObjectPool : MonoBehaviour {
             var poolHolder = poolContainers[containerIndex];
             for (var i = 0; i < addPoolSize; i++)
             {
-                var newEntity = Instantiate(prefab);
+                var newEntity = Object.Instantiate(prefab);
                 newEntity.ConvertToEntity();
                 ref var newObject = ref newEntity.Entity.Get<Pooled>();
                 newObject.containerIndex = containerIndex;
@@ -220,7 +287,7 @@ public class ObjectPool : MonoBehaviour {
         var poolKey = prefab.GetInstanceID();
         if (Instance.entityPool.ContainsKey(poolKey))
         {
-            Destroy(poolContainers[entityPool[poolKey].Dequeue().Get<Pooled>().containerIndex].transform.gameObject);
+            Object.Destroy(poolContainers[entityPool[poolKey].Dequeue().Get<Pooled>().containerIndex].transform.gameObject);
             poolContainers.RemoveAt(entityPool[poolKey].Dequeue().Get<Pooled>().containerIndex);
             entityPool[poolKey].Clear();
             entityPool.Remove(poolKey);
@@ -231,7 +298,12 @@ public class ObjectPool : MonoBehaviour {
 
 public enum PoolObjectMode {
     GameObject,
-    ChangePosition
+    ChangePosition,
+    Pure
+}
+
+public struct Lifetime {
+    public float value;
 }
 [EcsComponent]
 public struct Pooled {
@@ -258,6 +330,9 @@ public struct Pooled {
         gameObject.name = name;
     }
 
+    public void SetActiveOnlyObject(bool value) {
+        mono.gameObject.SetActive(value);
+    }
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void SetActive(bool value)
     {
@@ -265,21 +340,47 @@ public struct Pooled {
         if (IsActive)
         {
             mono.Entity.Remove<Inactive>();
-            mono.Entity.Set<PooledEvent>();
-            CurrentLifeTime = LifeTime;
+            
+            mono.Entity.Add<PooledEvent>();
         }
         else
         {
-            mono.Entity.Set<Inactive>();
+            mono.Entity.Add<Inactive>();
+            mono.Entity.Get<Lifetime>().value = LifeTime;
+            if(poolKey != 0)
+                ObjectPool.GetPool(poolKey).Enqueue(mono.Entity);
+        }
+
+        if (Mode == PoolObjectMode.ChangePosition && !IsActive) {
+            transform.position = UnActivePosition;
+        }
+        else if (Mode == PoolObjectMode.GameObject) {
+            mono.SetActive(IsActive);
+        }
+    }
+    
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public void SetActive(bool value, ref Lifetime lifetime)
+    {
+        IsActive = value;
+        if (IsActive)
+        {
+            mono.Entity.Remove<Inactive>();
+            mono.Entity.Add<PooledEvent>();
+            lifetime.value = LifeTime;
+        }
+        else
+        {
+            mono.Entity.Add<Inactive>();
             ObjectPool.GetPool(poolKey).Enqueue(mono.Entity);
         }
 
         if (Mode == PoolObjectMode.ChangePosition && !IsActive)
             transform.position = UnActivePosition;
         else
-            mono.SetActive(IsActive);
+            mono.gameObject.SetActive(IsActive);
     }
-
+    
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void Reuse(Vector3 position, Quaternion rotation)
     {
@@ -291,7 +392,6 @@ public struct Pooled {
             ref var transformPure = ref mono.Entity.Get<TransformComponent>();
             transformPure.position = position;
             transformPure.rotation = rotation;
-            transformPure.scale = Vector3.one;
         }
     }
 }
@@ -323,5 +423,26 @@ public class PoolContainer {
     {
         size++;
         transform.name = $"[Pool] {Name} [KeyID:{poolKey}]  Size:{size}";
+    }
+}
+
+
+
+public class PoolCommand {
+    public enum CommandType {
+        Pool,
+        Instatiate
+    }
+    public struct Command {
+        public Entity entity;
+        public int prefab;
+        public Vector3 pos;
+        public Quaternion rotation;
+        public CommandType CommandType;
+    }
+    public DynamicArray<Command> Buffer;
+
+    public PoolCommand() {
+        Buffer = new DynamicArray<Command>(64);
     }
 }

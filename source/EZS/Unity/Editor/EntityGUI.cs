@@ -18,16 +18,24 @@ namespace Wargon.ezs.Unity
         }
 
         static EntityGUI() {
+            EditorApplication.playModeStateChanged += EditorApplicationOnplayModeStateChanged;
             Init();
         }
+
+        private static void EditorApplicationOnplayModeStateChanged(PlayModeStateChange obj) {
+            inited = false;
+        }
+
         private static bool inited;
+
         public static void Init()
         {
             if(inited) return;
+            
             colorBoxesByType = new Dictionary<Type, GUIStyle>();
             ComponentTypesList.Init();
             InitColorStyles();
-            Debug.Log("ENTITY GUI RELOAD");
+            //Debug.Log("ENTITY GUI RELOAD");
             inited = true;
         }
         private static void InitColorStyles()

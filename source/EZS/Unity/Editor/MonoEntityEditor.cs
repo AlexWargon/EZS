@@ -199,7 +199,7 @@ namespace Wargon.ezs.Unity {
             if (monoEntity.runTime) {
                 var archetype = monoEntity.Entity.GetArchetype();
                 foreach (var i in archetype.Mask) {
-                    var component = monoEntity.Entity.World.GetPoolByID(i).Get(monoEntity.id);
+                    var component = monoEntity.Entity.World.GetPoolByID(i).GetBoxed(monoEntity.id);
                     ComponentInspectorInternal.DrawComponentRun(monoEntity, target, component);
                 }
             }

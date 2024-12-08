@@ -32,12 +32,12 @@ namespace Wargon.ezs.Unity {
                 if (world != null)
                     if (world.Alive)
                         if (!Entity.IsNULL())
-                            Entity.Destroy();
+                            Entity.DestroyLate();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public virtual void ConvertToEntity() {
-            if (converted) return;
+        public virtual Entity ConvertToEntity() {
+            if (converted) return Entity;
             GO = gameObject;
             Entity = MonoConverter.GetWorld().CreateEntity();
             world = Entity.World;
@@ -50,6 +50,7 @@ namespace Wargon.ezs.Unity {
             if (destroyComponent) Destroy(this);
             if (destroyObject) Destroy(gameObject);
             runTime = true;
+            return Entity;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -76,7 +77,7 @@ namespace Wargon.ezs.Unity {
             if (!converted) return;
             if (!world.Alive) return;
             if (Entity.IsNULL()) return;
-            Entity.Set<Inactive>();
+            Entity.Add<Inactive>();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -96,8 +97,9 @@ namespace Wargon.ezs.Unity {
     public struct View {
         public MonoEntity Value;
     }
-    public struct EntityConvertedEvent {}
+    
     public static class MonoEntityExtension {
+
         public static string ToJson(this MonoEntity monoEntity) {
             var components = monoEntity.Components;
             var monoEntityJson = $"{monoEntity.name} :";

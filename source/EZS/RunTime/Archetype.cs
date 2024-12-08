@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
+using UnityEngine;
 
 namespace Wargon.ezs {
 
@@ -16,6 +17,9 @@ namespace Wargon.ezs {
             return q;
         }
 
+        internal EntityQuery GetQueryById(int id) {
+            return queries[id];
+        }
         public DynamicArray<EntityQuery> GetAllQueries() => queries;
     }
 
@@ -72,7 +76,7 @@ namespace Wargon.ezs {
             return archetype;
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static int GetHashCode(HashSet<int> mask, int owner) {
+        internal static int GetHashCode(HashSet<int> mask, int owner) {
             unchecked {
                 int hash = (int) 2166136261;
                 const int p = 16777619;
@@ -84,12 +88,12 @@ namespace Wargon.ezs {
                 hash += hash << 3;
                 hash ^= hash >> 17;
                 hash += hash << 5;
-                hash ^= hash >> owner;
+                hash += hash >> owner;
                 return hash;
             }
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static int GetHashCode(int[] mask, int owner) {
+        internal static int GetHashCode(int[] mask, int owner) {
             unchecked {
                 int hash = (int) 2166136261;
                 const int p = 16777619;
@@ -103,7 +107,7 @@ namespace Wargon.ezs {
                 hash += hash << 3;
                 hash ^= hash >> 17;
                 hash += hash << 5;
-                hash ^= hash >> owner;
+                hash += hash >> owner;
                 return hash;
             }
         }
@@ -116,6 +120,7 @@ namespace Wargon.ezs {
     
     public partial class World {
         private readonly DynamicArray<DirtyEntity> dirtyEntities = new DynamicArray<DirtyEntity>(Configs.EntityCacheSize);
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal void AddDirtyEntity(int entity, Archetype.Edge migrationEdge) {
             ref var e = ref dirtyEntities.GetLastWithIncrement();
@@ -131,7 +136,8 @@ namespace Wargon.ezs {
             dirtyEntities.ClearCount();
         }
     }
-
+    
+    
     public sealed class Archetype {
         private readonly World world;
         internal readonly HashSet<int> mask;
@@ -140,7 +146,8 @@ namespace Wargon.ezs {
         private readonly Dictionary<int, ComponentEdge> componentEdges;
         private readonly Dictionary<int, OwnerEdge> OwnerEdges;
         private readonly ComponentEdge DestroyEdge;
-        internal readonly int owner = -1;
+        private readonly ComponentEdge CreateEdge;
+        internal readonly int owner;
         private readonly int id;
         public int ID => id;
         internal readonly bool IsEmpty;
@@ -152,6 +159,7 @@ namespace Wargon.ezs {
             this.OwnerEdges = new Dictionary<int, OwnerEdge>();
             this.IsEmpty = true;
             this.id = 0;
+            this.owner = -1;
         }
 
         public Archetype(World world, HashSet<int> mask, int id, int owner) {
@@ -173,28 +181,47 @@ namespace Wargon.ezs {
             for (int i = 0; i < queries.Count; i++) {
                 this.DestroyEdge.remove.AddToRemoveEntity(queries[i]);
             }
+            this.CreateEdge = new ComponentEdge(new Edge(this), new Edge(null));
+            for (int i = 0; i < queries.Count; i++) {
+                this.CreateEdge.add.AddToAddEntity(queries[i]);
+            }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public Entity CreateEntity() {
-            var e = world.CreateEntity(this);
-            return e;
+            var entity = world.CreateEntity(this);
+            foreach (var i in mask) {
+                var pool = world.GetPoolByID(i);
+                pool.Add(entity.id);
+                pool.Set(entity.id);
+            }
+            entity.GetEntityData().archetype = this;
+            world.AddDirtyEntity(entity.id, CreateEdge.add);
+            return entity;
         }
-
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public Entity Copy(Entity e) {
+            var entity = world.CreateEntity(this);
+            foreach (var i in mask) {
+                var pool = world.GetPoolByID(i);
+                pool.Copy(e.id, entity.id);
+            }
+            entity.GetEntityData().archetype = this;
+            world.AddDirtyEntity(entity.id, CreateEdge.add);
+            return entity;
+        }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public Entity CreateEntity(List<object> components) {
-            var e = world.CreateEntity(this);
+            var entity = world.CreateEntity(this);
             var index = 0;
             foreach (var i in mask) {
                 var pool = world.GetPoolByID(i);
-                pool.SetBoxed(components[index],e.id);
-                pool.Add(e.id);
+                pool.SetBoxed(components[index],entity.id);
+                pool.Add(entity.id);
             }
-            
-            for (var i = 0; i < queries.Count; i++) {
-                queries[i].Add(e.id);
-            }
-            return e;
+            entity.GetEntityData().archetype = this;
+            world.AddDirtyEntity(entity.id, CreateEdge.add);
+            return entity;
         }
 
 
@@ -206,9 +233,9 @@ namespace Wargon.ezs {
         }
 
         internal void UpdateEdges(EntityQuery query) {
-            foreach (var ComponentEdge in componentEdges.Values) {
-                var add = ComponentEdge.add;
-                var remove = ComponentEdge.remove;
+            foreach (var edge in componentEdges.Values) {
+                var add = edge.add;
+                var remove = edge.remove;
                 
                 for (var i = 0; i < queries.Count; i++) {
                     if (!add.toMove.HasQuery(query))
@@ -230,10 +257,24 @@ namespace Wargon.ezs {
                         remove.AddToAddEntity(query);
                 }
             }
+
+            foreach (var ownerEdge in OwnerEdges.Values) {
+                for (var i = 0; i < queries.Count; i++) {
+                    if (!ownerEdge.buffer.toMove.HasQuery(query))
+                        ownerEdge.buffer.AddToRemoveEntity(query);
+                }
+
+                for (var i = 0; i < ownerEdge.buffer.toMove.queries.Count; i++) {
+                    if (!HasQuery(query))
+                        ownerEdge.buffer.AddToAddEntity(query);
+                }
+            }
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private bool IsQueryMatch(EntityQuery q) {
-            if (owner != -1 && q.owner != -1 && owner != q.owner) return false;
+            if (owner != -1 && q.owner != -1 && owner != q.owner) {
+                return false;
+            }
 
             for (var i = 0; i < q.none.Count; i++) {
                 if (mask.Contains(q.none.Items[i]))
@@ -253,14 +294,14 @@ namespace Wargon.ezs {
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Remove(int entity) {
+        internal void Remove(int entity) {
             for (int i = 0; i < queries.Count; i++) {
                 queries.Items[i].Remove(entity);
             }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void TransferAdd(ref EntityData entity, int component) {
+        internal void TransferAdd(ref EntityData entity, int component) {
             if (componentEdges.TryGetValue(component, out ComponentEdge edge)) {
                 world.AddDirtyEntity(entity.id, edge.add);
                 entity.archetype = edge.add.toMove;
@@ -273,7 +314,7 @@ namespace Wargon.ezs {
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void TransferRemove(ref EntityData entity, int component) {
+        internal void TransferRemove(ref EntityData entity, int component) {
             if (componentEdges.TryGetValue(component, out ComponentEdge edge)) {
                 entity.archetype = edge.remove.toMove;
                 world.AddDirtyEntity(entity.id, edge.remove);
@@ -288,27 +329,27 @@ namespace Wargon.ezs {
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void TransferOwnerChange(ref EntityData entity, int component, int owner) {
-            if(this.owner==owner) return;
-            if (OwnerEdges.TryGetValue(owner, out OwnerEdge edge)) {
+        internal void TransferOwnerChange(ref EntityData entity, int newOwner) {
+            if(this.owner == newOwner) return;
+            if (OwnerEdges.TryGetValue(newOwner, out OwnerEdge edge)) {
                 entity.archetype = edge.buffer.toMove;
                 world.AddDirtyEntity(entity.id, edge.buffer);
                 return;
             }
 
-            CreateOwnerEdge(component, owner, out edge);
+            CreateOwnerEdge(-1, newOwner, out edge);
             world.AddDirtyEntity(entity.id, edge.buffer);
             entity.archetype = edge.buffer.toMove;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void TransferOwnerAdd(ref EntityData entity, int component, int owner) {
-            if (OwnerEdges.TryGetValue(owner, out OwnerEdge edge)) {
+        public void TransferOwnerAdd(ref EntityData entity, int component, int newOwner) {
+            if (OwnerEdges.TryGetValue(newOwner, out OwnerEdge edge)) {
                 world.AddDirtyEntity(entity.id, edge.buffer);
                 entity.archetype = edge.buffer.toMove;
                 return;
             }
-            CreateOwnerEdge(component, owner, out edge);
+            CreateOwnerEdge(component, newOwner, out edge);
             world.AddDirtyEntity(entity.id, edge.buffer);
             entity.archetype = edge.buffer.toMove;
         }
@@ -316,7 +357,6 @@ namespace Wargon.ezs {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void TransferDestroy(ref EntityData entity) {
             world.AddDirtyEntity(entity.id, DestroyEdge.remove);
-            entity.version++;
         }
         
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -326,6 +366,7 @@ namespace Wargon.ezs {
             maskRemove.Remove(component);
             
             edge = new ComponentEdge(
+                
                 GetOrCreateMigration(world.GetOrCreateArchetype(maskAdd, owmer))
                 , GetOrCreateMigration(world.GetOrCreateArchetype(maskRemove, owmer)));
             componentEdges.Add(component,edge);
@@ -337,8 +378,7 @@ namespace Wargon.ezs {
             var maskAdd = new HashSet<int>(mask);
             if (component != -1) maskAdd.Add(component);
             
-            edge = new OwnerEdge(
-                GetOrCreateMigration(world.GetOrCreateArchetype(maskAdd, owmer)));
+            edge = new OwnerEdge(GetOrCreateMigration(world.GetOrCreateArchetype(maskAdd, owmer)));
             OwnerEdges.Add(owmer,edge);
         }
 
@@ -368,7 +408,7 @@ namespace Wargon.ezs {
         }
 
         private struct ComponentEdge {
-            internal readonly Edge add;
+            internal Edge add;
             internal Edge remove;
 
             public ComponentEdge(Edge add, Edge remove) {
@@ -377,8 +417,8 @@ namespace Wargon.ezs {
             }
         }
 
-        private readonly struct OwnerEdge {
-            internal readonly Edge buffer;
+        private struct OwnerEdge {
+            internal Edge buffer;
 
             public OwnerEdge(Edge buffer) {
                 this.buffer = buffer;
@@ -422,27 +462,148 @@ namespace Wargon.ezs {
         }
     }
     public unsafe readonly struct NativeEntityQuery {
-        [NativeDisableUnsafePtrRestriction] private readonly int* entnties;
+        [NativeDisableUnsafePtrRestriction] private readonly int* entities;
         [NativeDisableUnsafePtrRestriction] private readonly int* entitiesMap;
         private readonly int count;
+        private readonly int entitiesLen;
         public int Count => count;
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal NativeEntityQuery(EntityQuery query) {
-            fixed (int* ptr = query.entities) entnties = ptr;
+            fixed (int* ptr = query.entities) entities = ptr;
             fixed (int* ptr = query.entitiesMap) entitiesMap = ptr;
             count = query.count;
+            entitiesLen = query.entities.Length;
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public int GetEntity(int index) => entnties[index];
+        public int GetEntity(int index) => entities[index];
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool Has(int entity) {
+            if (entitiesLen <= entity) return false;
+            return entitiesMap[entity] > 0;
+        }
     }
+
+    public unsafe struct NEntityQuery : IDisposable {
+        internal Internal* ptr;
+
+        public NEntityQuery(World world, int id) {
+            ptr = (Internal*)UnsafeUtility.Malloc(sizeof(Internal), UnsafeUtility.AlignOf<Internal>(),
+                Allocator.Persistent);
+            ptr->entities = new UnsafeList<int>(128, Allocator.Persistent);
+            ptr->entitiesMap = new UnsafeList<int>(128, Allocator.Persistent);
+            ptr->worldID = world.ID;
+            ptr->id = id;
+            ptr->owner = -1;
+            ptr->withCount = 0;
+            ptr->noneCount = 0;
+        }
+        
+        public void Dispose() {
+            ptr->Clear();
+            UnsafeUtility.Free(ptr, Allocator.Persistent);
+        }
+        internal ref Internal Ptr => ref *ptr;
+        internal struct Internal {
+            internal fixed int with[12];
+            internal int withCount;
+            internal fixed int none[8];
+            internal int noneCount;
+            internal int count;
+            internal UnsafeList<int> entities;
+            internal UnsafeList<int> entitiesMap;
+            internal int owner;
+            internal int id;
+            internal int worldID;
+            
+            internal void Clear() {
+                entities.Dispose();
+                entitiesMap.Dispose();
+            }
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            internal unsafe void Add(int entity) {
+                if (entities.Length - 1 <= count) {
+                    entities.Resize(count+16);
+                }
+                if (entitiesMap.Length - 1 <= entity) {
+                    entitiesMap.Resize(count+16);
+                }
+                entities[count++] = entity;
+                entitiesMap[entity] = count;
+                
+            }
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            internal void Remove(int entity) {
+                if (!Has(entity)) return;
+                var index = entitiesMap[entity] - 1;
+                entitiesMap[entity] = 0;
+                count--;
+                if (count > index) {
+                    entities[index] = entities[count];
+                    entitiesMap[entities[index]] = index + 1;
+                }
+            }
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            internal bool Has(int entity) {
+                if (entitiesMap.Length <= entity) return false;
+                return entitiesMap[entity] > 0;
+            }
+            public void With<T>() where T: struct {
+                with[withCount++] = ComponentType<T>.ID;
+                fixed (int* p = with) {
+                    var s = p->GetHashCode();
+                }
+            }
+
+            public void Without<T>()  where T: struct {
+                none[noneCount++] = ComponentType<T>.ID;
+            }
+        }
+        
+        public NEntityQuery With<T>()  where T : struct {
+            ptr->With<T>();
+            return this;
+        }
+
+        public NEntityQuery Without<T>() where T : struct {
+            ptr->Without<T>();
+            return this;
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public int GetEntityIndex(int index) {
+            return ptr->entities[index];
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ref Entity GetEntity(int index) {
+            return ref Worlds.GetWorld(ptr->worldID).GetEntity(ptr->entities[index]);
+        }
+
+    }
+    
     public class EntityQuery {
         internal readonly DynamicArray<int> with;
         internal readonly DynamicArray<int> none;
-        public int Count => count;
+        /// <summary>
+        /// Is there no entities in query
+        /// </summary>
+        public bool IsEmpty {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get => count == 0;
+        }
+        /// <summary>
+        /// Entities amount in query
+        /// </summary>
+        public int Count {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)] 
+            get {
+                return count;
+            }   
+        }
         internal int count;
         internal int[] entities;
         internal int[] entitiesMap;
         internal int owner;
+        public Entity Owner => world.GetEntity(owner);
         internal readonly int id;
         internal readonly World world;
 
@@ -454,10 +615,21 @@ namespace Wargon.ezs {
             count = 0;
             entities = new int[Configs.EntityCacheSize];
             entitiesMap = new int[Configs.EntityCacheSize];
+            lockedEntities = new DynamicArray<LockedEntity>(64);
             owner = -1;
+        }
+
+        public EntityQuery SetCapacity(int capacity) {
+            Array.Resize(ref entities, capacity);
+            Array.Resize(ref entitiesMap, capacity);
+            return this;
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal void Add(int entity) {
+            if (locked) {
+                AddLocked(entity);
+                return;
+            }
             if (entities.Length - 1 <= count) {
                 Array.Resize(ref entities, count + 16);
             }
@@ -466,10 +638,16 @@ namespace Wargon.ezs {
             }
             entities[count++] = entity;
             entitiesMap[entity] = count;
+            if (onAddNotNull)
+                onAdd(entity, world);
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal void Remove(int entity) {
-            if (!Has(entity)) return;
+            if (locked) {
+                RemoveLocked(entity);
+                return;
+            }
+            if (Has(entity) == false) return;
             var index = entitiesMap[entity] - 1;
             entitiesMap[entity] = 0;
             count--;
@@ -477,19 +655,21 @@ namespace Wargon.ezs {
                 entities[index] = entities[count];
                 entitiesMap[entities[index]] = index + 1;
             }
+            if (onRemoveNotNull)
+                onRemove(entity, world);
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal bool Has(int entity) {
+        public bool Has(int entity) {
             if (entitiesMap.Length <= entity) return false;
             return entitiesMap[entity] > 0;
         }
         
-        public EntityQuery With<T>() {
+        public EntityQuery With<T>() where T: struct {
             with.Add(ComponentType<T>.ID);
             return this;
         }
 
-        public EntityQuery Without<T>() {
+        public EntityQuery Without<T>()  where T: struct {
             none.Add(ComponentType<T>.ID);
             return this;
         }
@@ -529,6 +709,139 @@ namespace Wargon.ezs {
             // }
             return this;
         }
+        /// <summary>
+        /// Sub for invoke when entity added to query
+        /// </summary>
+        /// <param name="func">Action(int entityID, Wolrd world)</param>
+        /// <returns></returns>
+        public unsafe EntityQuery OnAdd(Action<int, World> func) {
+            onAdd = func;
+            onAddNotNull = true;
+            return this;
+        }
+        /// <summary>
+        /// Sub for invoke when entity removed from query
+        /// </summary>
+        /// <param name="func">Action(int entityID, Wolrd world)</param>
+        /// <returns></returns>
+        public unsafe EntityQuery OnRemove(Action<int, World> func) {
+            onRemove = func;
+            onRemoveNotNull = true;
+            return this;
+        }
+        private bool onAddNotNull;
+        private bool onRemoveNotNull;
+        private unsafe Action<int, World> onAdd;
+        private unsafe Action<int, World> onRemove;
+
+        struct LockedEntity {
+            public int entity;
+            public bool add;
+        }
+
+        private readonly DynamicArray<LockedEntity> lockedEntities;
+        private bool locked;
+        
+        private int chunkIndex;
+        private int splitedFrames;
+        private int lockedFramesCounter;
+        private int lockedCount;
+        private int lastFrameLockedCount;
+        public bool Locked => locked;
+        public int LockedCount {
+            get {
+                return lockedCount;
+            }
+        }
+
+        public int SplitedFrames => splitedFrames;
+        public void SpliteFor(int value) {
+            splitedFrames = value;
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ref Entity GetLockedEntity(int index) {
+            return ref world.GetEntity(entities[chunkIndex + index]);
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal void Lock() {
+            locked = true;
+            lockedFramesCounter = splitedFrames;
+            chunkIndex = 0;
+            GetLockedEntitiesCount();
+            //Debug.Log("LOCKED");
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void GetLockedEntitiesCount() {
+            lockedCount = count / splitedFrames;
+            lastFrameLockedCount = count - lockedCount * splitedFrames;
+            //Debug.Log(count/splitedFrames);
+            //Debug.Log($"count = {count} | lockedCount = {lockedCount} | lastFrameLockedCount = {lastFrameLockedCount}" );
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool TryLock() {
+            if (locked) return false;
+            if (lockedFramesCounter == 0) {
+                Lock();
+                return true;
+            }
+
+            return false;
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool TryUnlock() {
+            lockedFramesCounter--;
+            
+            if (lockedFramesCounter == 1) {
+                lockedCount = lastFrameLockedCount;
+                //Debug.Log($"lockedCount : {lockedCount}");
+                return false;
+            }
+            chunkIndex += lockedCount;
+            //Debug.Log($"count = {count} | lockedCount = {lockedCount} | chunkIndex = {chunkIndex} | lockedFramesCounter = {lockedFramesCounter}  | lastFrameLockedCount = {lastFrameLockedCount}" );
+            if (lockedFramesCounter == 0) {
+                Unlock();
+                //Debug.Log("UNLOCKED");
+                return true;
+            }
+            return false;
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void Unlock() {
+            for (var i = 0; i < lockedEntities.Count; i++) {
+                ref var e = ref lockedEntities.Items[i];
+                if (e.add) {
+                    if (entities.Length - 1 <= count) {
+                        Array.Resize(ref entities, count + 16);
+                    }
+                    if (entitiesMap.Length - 1 <= e.entity) {
+                        Array.Resize(ref entitiesMap, e.entity + 16);
+                    }
+                    entities[count++] = e.entity;
+                    entitiesMap[e.entity] = count;
+                }
+                else {
+                    if (!Has(e.entity)) continue;
+                    var index = entitiesMap[e.entity] - 1;
+                    entitiesMap[e.entity] = 0;
+                    count--;
+                    if (count > index) {
+                        entities[index] = entities[count];
+                        entitiesMap[entities[index]] = index + 1;
+                    }
+                }
+            }
+            lockedEntities.ClearCount();
+            locked = false;
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void AddLocked(int entity) {
+            lockedEntities.Add(new LockedEntity{entity = entity, add = true});
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void RemoveLocked(int entity) {
+            lockedEntities.Add(new LockedEntity{entity = entity, add = false});
+        }
+
 
         public override string ToString() {
             var types = string.Empty;

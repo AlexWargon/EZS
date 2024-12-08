@@ -412,7 +412,7 @@ namespace Wargon.ezs
             return ref poolB.items[entities[index]];
         }
 
-        public class WithOut<NA> : EntityType<A, B> where NA : new()
+        public class WithOut<NA> : EntityType<A, B> where NA : struct
         {
             public WithOut(World world) : base(world)
             {
@@ -427,7 +427,7 @@ namespace Wargon.ezs
             }
         }
 
-        public class WithOut<NA, NB> : EntityType<A, B> where NA : new() where NB : new()
+        public class WithOut<NA, NB> : EntityType<A, B> where NA : struct where NB : struct
         {
             public WithOut(World world) : base(world)
             {
@@ -492,7 +492,7 @@ namespace Wargon.ezs
             return poolС.items[entities[index]];
         }
 
-        public class Without<NA> : EntityType<A, B, C> where NA : new()
+        public class Without<NA> : EntityType<A, B, C> where NA : struct
         {
             public Without(World world) : base(world)
             {
@@ -507,7 +507,7 @@ namespace Wargon.ezs
             }
         }
 
-        public class Without<NA, NB> : EntityType<A, B, C> where NA : new() where NB : new()
+        public class Without<NA, NB> : EntityType<A, B, C> where NA : struct where NB : struct
         {
             public Without(World world) : base(world)
             {
@@ -583,7 +583,7 @@ namespace Wargon.ezs
             return poolD.items[entities[index]];
         }
 
-        public class WithOut<NA> : EntityType<A, B, C, D> where NA : new()
+        public class WithOut<NA> : EntityType<A, B, C, D> where NA : struct
         {
             public WithOut(World world) : base(world)
             {
@@ -598,7 +598,7 @@ namespace Wargon.ezs
             }
         }
 
-        public class WithOut<NA, NB> : EntityType<A, B, C, D> where NA : new() where NB : new()
+        public class WithOut<NA, NB> : EntityType<A, B, C, D> where NA : struct where NB : struct
         {
             public WithOut(World world) : base(world)
             {
@@ -685,7 +685,7 @@ namespace Wargon.ezs
             return poolE.items[entities[index]];
         }
 
-        public class WithOut<NA> : EntityType<A, B, C, D, E> where NA : new()
+        public class WithOut<NA> : EntityType<A, B, C, D, E> where NA : struct
         {
             public WithOut(World world) : base(world)
             {
@@ -700,7 +700,7 @@ namespace Wargon.ezs
             }
         }
 
-        public class WithOut<NA, NB> : EntityType<A, B, C, D, E> where NA : new() where NB : new()
+        public class WithOut<NA, NB> : EntityType<A, B, C, D, E> where NA : struct where NB : struct
         {
             public WithOut(World world) : base(world)
             {
@@ -923,7 +923,7 @@ namespace Wargon.ezs
             return poolG.items[entities[index]];
         }
 
-        public class WithOut<NA> : EntityType<A, B, C, D, E, F, G> where NA : new()
+        public class WithOut<NA> : EntityType<A, B, C, D, E, F, G> where NA : struct
         {
             public WithOut(World world) : base(world)
             {
@@ -938,7 +938,7 @@ namespace Wargon.ezs
             }
         }
 
-        public class WithOut<NA, NB> : EntityType<A, B, C, D, E, F, G> where NA : new() where NB : new()
+        public class WithOut<NA, NB> : EntityType<A, B, C, D, E, F, G> where NA : struct where NB : struct
         {
             public WithOut(World world) : base(world)
             {
