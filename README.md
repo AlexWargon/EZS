@@ -101,29 +101,8 @@ public partial class UpdateExampleSystem : UpdateSystem
 }
 ```
 
-2. Reactive systems 
-```C#
-//Call system when component added to some entity
-public class DamageSystem : OnAdd<Damaged> 
-{
-        public override void Execute(in Enitity entity) 
-        {
-                //some logic
-        }
-}
-```
-```C#
-//Call system when component removed from some entity
-public class OnRemoveSystem : OnRemove<SomeComponent> 
-{
-        public override void Execute(in Enitity entity) 
-        {
-                //some logic
-        }
-}
-```
 
-3. Init systems
+2. Init systems
 ```C#
 //Call system at start of world live
 public class InitExampleSystem : InitSystem
@@ -138,7 +117,7 @@ public class InitExampleSystem : InitSystem
 }
 ```
 
-4. Destroy systems
+3. Destroy systems
 ```C#
 //Call system during the destruction of the world
 public class DestroyExampleSystem : DestroySystem
